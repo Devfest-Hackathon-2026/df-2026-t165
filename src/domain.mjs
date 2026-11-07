@@ -10,13 +10,14 @@ export const emptyCard=()=>({title:'雨の日の提灯準備',facts:Object.fromE
 export function validateRequest(r){if(!r||typeof r.question!=='string'||!r.question.trim())throw Error('聞きたいことを入力してください');return {id:randomUUID(),event:String(r.event||DEMO.event).slice(0,100),task:String(r.task||DEMO.task).slice(0,100),question:r.question.trim().slice(0,1000),speaker:String(r.speaker||'地域の経験者').slice(0,100),status:'requested',turns:[],createdAt:new Date().toISOString(),metrics:{},sampleData:Boolean(r.sampleData)}}
 export function localCard(turns){let c=emptyCard();const spoken=turns.filter(t=>t.role==='user');let put=(k,v,t)=>{c.facts[k]={...c.facts[k],value:v,sourceIds:[t.id],status:'stated'}};
  for(const t of spoken){let s=t.text;
+  const correction=s.match(/^確認時の追記（([^）]+)）：([\s\S]+)$/);
+  if(correction){const key=FACTS.find(([,l])=>l===correction[1])?.[0];if(key){if(correction[2]==='未確認')c.facts[key]={...c.facts[key],value:'未確認',sourceIds:[],status:'unknown'};else put(key,correction[2],t);}continue;}
   const time=s.match(/(?:朝|午前|午後|夕方)?\s*\d{1,2}時(?:\d{1,2}分)?/);if(time)put('when',(/祭りの前日|祭り前日/.test(s)?'祭りの前日、':'')+time[0].trim(),t);
   const where=s.match(/(?:雨なら|雨の日は|雨天時は|雨のときは)[、\s]*([^。\n]+?)(?:で[、\s]*(?:紙の|提灯|準備|作業)|です|。|$)/);if(where)put('where',where[1].replace(/で$/,''),t);
   const why=s.match(/([^。\n]+?(?:ためです|ため|からです))/);if(why&&/濡|ぬれ|紙|雨|水/.test(why[1]))put('why',why[1],t);
   const contact=s.match(/([^。\n]*?(?:責任者|担当者)[^。\n]*?(?:確認してください|確認します|聞いてください))/);if(contact)put('contact',contact[1],t);
   const mat=s.match(/([^。\n]+?)(?:を用意します|を持ってきて|が必要です)/);if(mat)put('materials',mat[1],t);
   const steps=s.match(/((?:まず|最初に)[^。\n]+(?:。[^\n]+)?)/);if(steps)put('steps',steps[1],t);
-  const correction=s.match(/^確認時の追記（([^）]+)）：([\s\S]+)$/);if(correction){const key=FACTS.find(([,l])=>l===correction[1])?.[0];if(key)put(key,correction[2],t);}
  }
  return c;
 }
@@ -25,7 +26,10 @@ export function localFollowup(request,turns){const users=turns.filter(t=>t.role=
  if(/いつもの|あそこ|例の場所/.test(last)&&card.facts.where.status==='unknown')return '「いつもの場所」は、初めて担当する人にはどこでしょうか。雨の日と晴れの日で、場所は変わりますか？';
  if(card.facts.where.status==='unknown')return '雨の日は、具体的にどこへ行けばよいですか？ 建物や部屋の名前を教えてください。';
  if(card.facts.why.status==='unknown')return '雨の日にその場所で準備するのは、どうしてですか？ 初めての人が気をつける理由も教えてください。';
- if(card.facts.materials.status==='unknown'||card.facts.steps.status==='unknown')return '何を用意して、どの順番で作業しますか？ 判断に迷ったときに確認する相手も、分かれば教えてください。';
+ if(card.facts.when.status==='unknown')return '準備の集合は、いつ、何時でしょうか？';
+ if(card.facts.materials.status==='unknown')return '準備するときに、何を用意すればよいですか？';
+ if(card.facts.steps.status==='unknown')return 'どの順番で作業するか、最初から教えていただけますか？';
+ if(card.facts.contact.status==='unknown')return '判断に迷ったとき、誰に確認すればよいですか？';
  return 'ありがとうございます。お話から手引きの下書きを作れます。分からないことは未確認のまま残して、最後に一緒に確かめましょう。';}
 export function normalizeCard(raw,turns){const c=emptyCard(),allowed=new Set(turns.filter(t=>t.role==='user').map(t=>t.id));if(raw?.title)c.title=String(raw.title).slice(0,150);
  for(const[k]of FACTS){const f=raw?.facts?.[k];if(!f)continue;let ids=Array.isArray(f.sourceIds)?f.sourceIds.filter(x=>allowed.has(x)):[];if(ids.length&&typeof f.value==='string'&&f.value.trim()&&f.value!=='未確認')c.facts[k]={...c.facts[k],value:f.value.slice(0,1500),sourceIds:[...new Set(ids)],status:'stated'};}
@@ -34,4 +38,21 @@ export function normalizeCard(raw,turns){const c=emptyCard(),allowed=new Set(tur
 export function sourceText(turns){return turns.filter(t=>t.role==='user').map(t=>`[${t.id}] ${t.text}`).join('\n')}
 export function reviewCard(request,input){const c=normalizeCard(input,request.turns);if(!input?.confirmed)throw Error('内容を確認し、確認済みにチェックしてください');return {...c,confirmedAt:new Date().toISOString(),confirmedBy:request.speaker,requestId:request.id}}
 export function assessAnswers(card,answers){const keys=['when','where','why','contact'];return keys.map(k=>({key:k,label:card.facts[k].label,expected:card.facts[k].value,answer:String(answers?.[k]||''),needsReview:true}));}
-export function answerKeys(question,card){const rules={when:/何時|集合|時間/,where:/どこ|場所|会場/,materials:/用意|持ち物|必要な物|道具/,steps:/手順|順番|どう準備|どうやって/,why:/なぜ|どうして|理由/,contact:/誰|だれ|確認先|責任者|担当/};const keys=Object.entries(rules).filter(([k,re])=>re.test(question)&&card.facts[k]?.status!=='unknown').map(([k])=>k);return keys}
+export function answerKeys(question,card){if(/晴れ|雪|台風|強風/.test(question))return [];const rules={when:/何時|集合|時間/,where:/どこ|場所|会場/,materials:/用意|持ち物|必要な物|道具/,steps:/手順|順番|どう準備|どうやって/,why:/なぜ|どうして|理由/,contact:/誰|だれ|確認先|責任者|担当/};const keys=Object.entries(rules).filter(([k,re])=>re.test(question)&&card?.facts?.[k]?.status==='stated'&&card.facts[k].sourceIds?.length).map(([k])=>k);return keys}
+
+export function confirmDraft(request,draft,values,confirmed){
+ if(!confirmed)throw Error('語り手と内容を確認してから、チェックを入れてください。');
+ const card=structuredClone(draft),turns=[...request.turns];let corrections=0;
+ for(const[k,label]of FACTS){
+  const value=String(values[k]??card.facts[k].value).trim()||'未確認';
+  if(value.length>1500)throw Error(label+'は1500文字以内で入力してください。');
+  if(value!==card.facts[k].value){
+   corrections++;const t={id:randomUUID(),role:'user',text:`確認時の追記（${label}）：${value}`,at:new Date().toISOString()};turns.push(t);
+   card.facts[k]={...card.facts[k],value,sourceIds:value==='未確認'?[]:[t.id],status:value==='未確認'?'unknown':'stated'};
+  }
+ }
+ const reviewed=reviewCard({...request,turns},{...card,confirmed:true});
+ return {card:reviewed,turns,corrections};
+}
+export function queueQuestion(request,question){request.pendingQuestions||=[];if(!request.pendingQuestions.includes(question))request.pendingQuestions.push(question)}
+export function takeNextQuestion(request){const q=request.pendingQuestions?.shift();if(q)request.currentQuestion=q;return q}
