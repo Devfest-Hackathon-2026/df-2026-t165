@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.runtime/
+qa/
+
+dist/
+public/domain.js
+public/vendor/
+.DS_Store
+.openai/

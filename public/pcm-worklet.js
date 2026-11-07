@@ -1,0 +1,1 @@
+class PcmCapture extends AudioWorkletProcessor {constructor(){super();this.buffer=[]}process(inputs,outputs){const input=inputs[0]?.[0];if(input){this.buffer.push(...input);if(this.buffer.length>=4096){this.port.postMessage(new Float32Array(this.buffer.splice(0,4096)))}}return true}}registerProcessor('pcm-capture',PcmCapture);
