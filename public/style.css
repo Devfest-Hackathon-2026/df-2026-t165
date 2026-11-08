@@ -1,33 +1,37 @@
 /* ツギテ — 継手（蟻継ぎ）。藍の部材＝語り手と町の過去、檜の部材＝次の担い手。 */
 :root {
-  --paper: #f3ede1;
-  --paper-2: #e9e1d0;
-  --sheet: #fbf7ef;
+  --paper: #f6f0e4;
+  --paper-2: #ede4d1;
+  --sheet: #fffaf0;
   --ink: #2b2723;
   --ink-2: #5b534b;
-  --ink-3: #776d63;
-  --ai: #223a5e;
-  --ai-deep: #172a45;
-  --ai-wash: #e3e5e8;
-  --hinoki: #b8863b;
-  --hinoki-light: #d8b06e;
-  --hinoki-wash: #f3e6cc;
-  --contour: #d6cbb6;
-  --rule: #e2d9c7;
+  --ink-3: #6f665d;
+  --ai: #1c3a6e;
+  --ai-deep: #142b54;
+  --ai-wash: #e3e9f3;
+  --hinoki: #f2a93b;
+  --hinoki-light: #f5b94f;
+  --hinoki-wash: #fdf0d6;
+  --contour: #dccfb6;
+  --rule: #e8dcc6;
   --yamabuki: #8a5a12;
-  --yamabuki-wash: #f3e6cc;
-  --koke: #4a6b46;
-  --koke-wash: #e4e8d8;
-  --shu: #b94a2c;
-  --shu-deep: #9a3a20;
-  --shu-wash: #f5e0d7;
+  --yamabuki-wash: #fdf0d6;
+  --koke: #1d7a7a;
+  --koke-wash: #def1ef;
+  --shu: #c83c22;
+  --shu-deep: #a8301a;
+  --shu-wash: #fbe3dc;
+  --shu-bright: #e0482a;
+  --asagi: #2a9a9a;
+  --asagi-deep: #1d7a7a;
+  --asagi-wash: #def1ef;
   --washi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .37 0 0 0 0 .25 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --mincho: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --gothic: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --mincho: "Klee One", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
+  --gothic: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Meiryo", sans-serif;
   --r-s: 8px;
   --r-m: 14px;
   --side: 264px;
-  --focus: 0 0 0 3px #fbf7ef, 0 0 0 5px var(--ai);
+  --focus: 0 0 0 3px #fffaf0, 0 0 0 5px var(--ai);
 }
 * {
   box-sizing: border-box;
@@ -2236,7 +2240,7 @@ h3 {
 }
 .hub-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 12px 28px rgba(30, 63, 102, 0.14);
+  box-shadow: 0 12px 28px rgba(28, 58, 110, 0.14);
   border-color: var(--rule);
 }
 .hub-card.is-main,
@@ -2249,14 +2253,14 @@ h3 {
   color: var(--hinoki-light);
 }
 .hub-card.is-main span {
-  color: #dce4ee;
+  color: #dbe3f1;
 }
 .hub-card.is-main em {
   color: var(--hinoki-light);
 }
 .hub-card.is-main:hover {
   background: var(--ai);
-  box-shadow: 0 12px 28px rgba(30, 63, 102, 0.28);
+  box-shadow: 0 12px 28px rgba(28, 58, 110, 0.28);
 }
 .hub-lower {
   display: grid;
@@ -2469,7 +2473,7 @@ h3 {
 }
 .band-sub {
   font-size: 13px;
-  color: #c9d4e1;
+  color: #cdd8ea;
 }
 .band-actions {
   margin-left: auto;
@@ -2483,7 +2487,7 @@ h3 {
   min-height: 44px;
   padding: 0 18px;
   border-radius: 10px;
-  border: 1px solid #6f8bad;
+  border: 1px solid #6d86b8;
   color: #fff;
   text-decoration: none;
   font-size: 14px;
@@ -2794,8 +2798,8 @@ aside {
 .wave-band,
 .footer::before,
 .town-band::before {
-  --w1: #223a5e;
-  --w2: #34507a;
+  --w1: #1c3a6e;
+  --w2: #2f5290;
   background-color: var(--w1);
   background-image:
     radial-gradient(circle at 100% 150%, var(--w1) 24%, var(--w2) 24%, var(--w2) 28%, var(--w1) 28%, var(--w1) 36%, var(--w2) 36%, var(--w2) 40%, transparent 40%, transparent),
@@ -2893,7 +2897,7 @@ aside {
   padding: 0 0 8px;
   border-radius: 22px;
   background-image:
-    linear-gradient(180deg, rgba(243, 237, 225, 0.55) 0%, rgba(243, 237, 225, 0.92) 55%, var(--paper) 100%),
+    linear-gradient(180deg, rgba(246, 240, 228, 0.55) 0%, rgba(246, 240, 228, 0.92) 55%, var(--paper) 100%),
     var(--hero-photo, none);
   background-size: cover;
   background-position: center 30%;
@@ -3073,4 +3077,97 @@ aside {
     width: 240px;
     right: 28px;
   }
+}
+
+/* =========================================================
+   配色の見直し（和田三造『配色総鑑』の組み合わせに学ぶ）
+   生成りの地に、紺を主役、朱と山吹を祭りの差し色、浅葱を根拠・確認の色に
+   ========================================================= */
+.intake-hello {
+  color: var(--shu);
+}
+.progress span.now,
+.typed::after {
+  background: var(--hinoki);
+}
+.choice:hover {
+  box-shadow: inset 4px 0 0 var(--hinoki);
+}
+.town-chip::before {
+  background: var(--shu-bright);
+}
+.cite,
+.cite-no {
+  background: var(--asagi-wash);
+  color: var(--asagi-deep);
+}
+.cite:hover {
+  background: var(--asagi-deep);
+  color: #fff;
+}
+.cite-row:hover {
+  border-color: var(--asagi);
+}
+.town-chat .answer {
+  box-shadow: inset 4px 0 0 var(--asagi);
+}
+.typing span {
+  background: var(--shu-bright);
+}
+.typing span:nth-child(2) {
+  background: var(--hinoki);
+}
+.typing span:nth-child(3) {
+  background: var(--asagi);
+}
+.hub-card::after {
+  border-color: var(--hinoki);
+  opacity: 0.22;
+}
+.hub-card:not(.is-main)::after {
+  border-color: var(--shu-bright);
+  opacity: 0.12;
+}
+.hub-card:not(.is-main) svg {
+  color: var(--shu);
+}
+.verified,
+.reasons em {
+  background: var(--asagi-wash);
+  color: var(--asagi-deep);
+}
+.status-dot {
+  background: var(--hinoki);
+}
+.status-dot.on {
+  background: var(--asagi);
+}
+.nav-item.is-current {
+  box-shadow: inset 4px 0 0 var(--shu-bright);
+}
+.suggest-chip {
+  background: var(--sheet);
+}
+.suggest-chip:hover {
+  border-color: var(--asagi);
+  color: var(--asagi-deep);
+}
+.material {
+  background: var(--hinoki-wash);
+}
+.msg.user .bubble {
+  background: var(--ai-wash);
+}
+h1,
+h2,
+h3,
+.town-chip,
+.product,
+.hub-card strong,
+.story-q {
+  font-weight: 600;
+}
+.hub-card.is-main::after {
+  border-color: var(--hinoki);
+  opacity: 0.45;
 }

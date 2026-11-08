@@ -19,7 +19,7 @@ const $ = (s) => document.querySelector(s),
 const icon = (n) => `<img class="icon" src="icons/${n}.svg" alt="">`;
 // ロゴ：木組みの継手（蟻継ぎ）。藍＝語り手と町の過去、檜＝次の担い手
 const logo = (size, join = false) =>
-  `<svg class="logo ${join ? "logo-join" : ""}" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><path class="logo-l" d="M4 12H20V18L30 14V34L20 30V36H4Z" fill="#1E3F66"/><path class="logo-r" d="M21.5 12H44V36H21.5V31.2L31.5 35.2V12.8L21.5 16.8Z" fill="#B7894A"/></svg>`;
+  `<svg class="logo ${join ? "logo-join" : ""}" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><path class="logo-l" d="M4 12H20V18L30 14V34L20 30V36H4Z" fill="#1C3A6E"/><path class="logo-r" d="M21.5 12H44V36H21.5V31.2L31.5 35.2V12.8L21.5 16.8Z" fill="#F2A93B"/></svg>`;
 const key = "tsugite-workspace-v1";
 let wid = localStorage.getItem("tsugite-id") || crypto.randomUUID();
 localStorage.setItem("tsugite-id", wid);
@@ -342,7 +342,7 @@ function lanterns(count = 5, width = 900, cls = "") {
       t = x / width,
       y = 18 * (1 - t) ** 2 + 2 * t * (1 - t) * 64 + 18 * t ** 2,
       red = i % 2 === 0;
-    return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><g class="lantern" style="--d:${(i * 0.37).toFixed(2)}s"><g class="lantern-swing"><line x1="0" y1="0" x2="0" y2="9" stroke="#2b2723" stroke-width="1.5"/><rect x="-11" y="9" width="22" height="6" rx="1.5" fill="#2b2723"/><ellipse class="lantern-body" cx="0" cy="40" rx="23" ry="26" fill="${red ? "#b94a2c" : "#f6efe0"}" stroke="${red ? "#9a3a20" : "#d6cbb6"}"/><path d="M-21 30Q0 25 21 30M-23 40Q0 35 23 40M-21 50Q0 45 21 50" fill="none" stroke="${red ? "#9a3a20" : "#d6cbb6"}" stroke-width="1"/><text x="0" y="47" text-anchor="middle" font-size="19" font-weight="800" font-family="Shippori Mincho B1, serif" fill="${red ? "#2b2723" : "#b94a2c"}">${red ? "祭" : "町"}</text><rect x="-11" y="65" width="22" height="6" rx="1.5" fill="#2b2723"/><line x1="0" y1="71" x2="0" y2="84" stroke="#b8863b" stroke-width="2"/></g></g></g>`;
+    return `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><g class="lantern" style="--d:${(i * 0.37).toFixed(2)}s"><g class="lantern-swing"><line x1="0" y1="0" x2="0" y2="9" stroke="#2b2723" stroke-width="1.5"/><rect x="-11" y="9" width="22" height="6" rx="1.5" fill="#2b2723"/><ellipse class="lantern-body" cx="0" cy="40" rx="23" ry="26" fill="${red ? "#e0482a" : "#fffaf0"}" stroke="${red ? "#a8301a" : "#e8d9bf"}"/><path d="M-21 30Q0 25 21 30M-23 40Q0 35 23 40M-21 50Q0 45 21 50" fill="none" stroke="${red ? "#a8301a" : "#e8d9bf"}" stroke-width="1"/><text x="0" y="47" text-anchor="middle" font-size="19" font-weight="600" font-family="Klee One, sans-serif" fill="${red ? "#2b2723" : "#e0482a"}">${red ? "祭" : "町"}</text><rect x="-11" y="65" width="22" height="6" rx="1.5" fill="#2b2723"/><line x1="0" y1="71" x2="0" y2="84" stroke="#f2a93b" stroke-width="2"/></g></g></g>`;
   }).join("");
   return `<svg class="lanterns ${cls}" viewBox="0 0 ${width} 160" preserveAspectRatio="xMidYMin meet" aria-hidden="true"><path d="M0 18Q${width / 2} 64 ${width} 18" fill="none" stroke="#2b2723" stroke-width="1.5"/>${items}</svg>`;
 }
