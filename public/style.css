@@ -2896,9 +2896,12 @@ aside {
   position: relative;
   padding: 0 0 8px;
   border-radius: 22px;
+}
+/* 祭りの写真があるときだけ、写真を薄く敷く（写真がないときは背景と同じ色のまま） */
+html.has-hero-photo .hub-hero {
   background-image:
     linear-gradient(180deg, rgba(246, 240, 228, 0.55) 0%, rgba(246, 240, 228, 0.92) 55%, var(--paper) 100%),
-    var(--hero-photo, none);
+    var(--hero-photo);
   background-size: cover;
   background-position: center 30%;
 }

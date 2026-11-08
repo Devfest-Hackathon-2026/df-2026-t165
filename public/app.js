@@ -356,7 +356,10 @@ function lanterns(count = 5, width = 900, cls = "") {
 }
 // 祭りの写真（public/images/matsuri.jpg）があれば、ホームの背景に敷く
 const heroPhoto = new Image();
-heroPhoto.onload = () => document.documentElement.style.setProperty("--hero-photo", "url(images/matsuri.jpg)");
+heroPhoto.onload = () => {
+  document.documentElement.style.setProperty("--hero-photo", "url(images/matsuri.jpg)");
+  document.documentElement.classList.add("has-hero-photo");
+};
 heroPhoto.src = "images/matsuri.jpg";
 function hub() {
   const first = !intake.typed.has("hub"),
