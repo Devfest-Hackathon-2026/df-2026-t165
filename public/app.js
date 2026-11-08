@@ -85,9 +85,21 @@ const statuses = {
   confirmed: "確認済み",
 };
 function shell(content) {
+  const history = state.requests
+    .map(
+      (r) =>
+        `<button class="history" data-request="${r.id}"><span class="history-q">${esc(r.question)}</span><span class="history-meta">${esc(r.event)}／${statuses[r.status] || ""}</span></button>`,
+    )
+    .join("");
   $("#app").innerHTML =
-    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><div class="brand">ツギテ</div><p class="brand-note">町の記憶を、次の担い手へ。</p><button class="nav-new" data-page="welcome">${icon("plus")}新しく相談する</button><button class="nav-mode" id="record-entry">${icon("mic")}話を残す</button><button class="nav-mode" data-page="regions">${icon("compass")}地域を探す</button><details class="side-history"><summary>最近のお話（${state.requests.length}）</summary>${state.requests.map((r) => `<button class="history" data-request="${r.id}">${esc(r.question)}<span>${esc(r.event)} · ${statuses[r.status] || ""}</span></button>`).join("")}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")} 設定</button><span class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード"}<br>生の音声は保存しません</span></div></aside><main><header class="topbar"><div class="product"><button class="mobile-menu" aria-label="メニューを開く">${icon("menu")}</button>ツギテ</div><div class="status"><span class="status-dot"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</div></header>${content}<footer class="footer">青葉地区・田中さんは架空です。初期のお話はデモ用の創作です。<br>${esc(saveMessage)} · ${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</footer></main><dialog id="dialog"></dialog>`;
-  document.querySelectorAll("[data-page]").forEach((b) => (b.onclick = () => go(b.dataset.page)));
+    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><a class="brand" href="#" data-page="welcome"><span class="brand-mark" aria-hidden="true">継</span><span><strong>ツギテ</strong><small>町の記憶を、次の担い手へ</small></span></a><nav class="side-nav" aria-label="主なメニュー"><button class="nav-item ${["welcome", "place", "regions"].includes(page) ? "is-current" : ""}" data-page="welcome">${icon("compass")}町の話を探す</button><button class="nav-item ${page === "home" ? "is-current" : ""}" data-page="home">${icon("book")}行事のことを聞く</button><button class="nav-item nav-record ${page === "interview" ? "is-current" : ""}" id="record-entry">${icon("mic")}話を残す<small>語り手の方はこちら</small></button></nav><details class="side-history" ${state.requests.length ? "open" : ""}><summary>これまでの相談<span>${state.requests.length}</span></summary>${history || '<p class="side-empty">まだありません。町の名前から探してみてください。</p>'}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")}設定</button><p class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード（ルール処理）"}<br>生の音声は保存しません</p></div></aside><main><header class="topbar"><button class="mobile-menu" aria-label="メニューを開く">${icon("menu")}</button><span class="product">ツギテ</span><span class="status"><span class="status-dot ${config.aiReady ? "on" : ""}"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</span></header><div class="page">${content}</div><footer class="footer"><p>青葉地区・田中さんは架空の地区と人物です。初期のお話はデモ用の創作です。</p><p>${esc(saveMessage)}。${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</p></footer></main><dialog id="dialog"></dialog>`;
+  document.querySelectorAll("[data-page]").forEach(
+    (b) =>
+      (b.onclick = (e) => {
+        e.preventDefault();
+        go(b.dataset.page);
+      }),
+  );
   document.querySelectorAll("[data-request]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -123,6 +135,7 @@ function render() {
   if (page === "welcome") welcome();
   else if (page === "home") home();
   else if (page === "regions") regions();
+  else if (page === "place") placePage();
   else if (page === "request") requestPage();
   else if (page === "interview") interview();
   else if (page === "review") review();
@@ -130,33 +143,153 @@ function render() {
   else if (page === "test") testPage();
   else if (page === "knowledge") knowledge();
 }
+let path = "known",
+  placeName = "",
+  placeDraft = "",
+  hearing = { env: "", values: [], area: "", note: "" },
+  homeEvent = DEMO.event;
+const hearingSteps = [
+  {
+    key: "env",
+    multi: false,
+    q: "どんな場所で暮らしたいですか？",
+    options: [
+      ["sea", "海や川の近く"],
+      ["mountain", "山や田畑のそば"],
+      ["town", "町なか・商店街のそば"],
+      ["any", "まだ決めていない"],
+    ],
+  },
+  {
+    key: "values",
+    multi: true,
+    q: "暮らしの中で、大事にしたいことは？（いくつでも）",
+    options: [
+      ["festival", "祭りや地域の行事"],
+      ["food", "食べ物や農の営み"],
+      ["trade", "商いや仕事のつながり"],
+      ["quiet", "静かで落ち着いた暮らし"],
+      ["family", "子育てや近所づきあい"],
+    ],
+  },
+  {
+    key: "area",
+    multi: false,
+    q: "考えている方面はありますか？",
+    options: [
+      ["tohoku", "東北"],
+      ["kansai", "関西"],
+      ["setouchi", "瀬戸内・四国"],
+      ["other", "そのほか"],
+      ["any", "こだわらない"],
+    ],
+  },
+];
 function welcome() {
+  const tab = (id, label, sub) =>
+    `<button type="button" role="tab" class="path-tab" id="tab-${id}" aria-selected="${path === id}" aria-controls="panel-${id}" data-path="${id}"><strong>${label}</strong><span>${sub}</span></button>`;
+  const known = `<form class="path-panel" id="panel-known" role="tabpanel" aria-labelledby="tab-known"><label class="label" for="place-input">町や地区の名前</label><input class="field field-place" id="place-input" value="${esc(placeName)}" placeholder="例：青葉地区、○○市△△町" autocomplete="off" required maxlength="80"><label class="label" for="place-question">知りたいこと（あとからでも大丈夫です）</label><div class="composer"><textarea id="place-question" placeholder="例：夏祭りの提灯は、なぜ公民館で準備するの？" maxlength="1000">${esc(placeDraft)}</textarea><button type="button" class="round" id="dictate" aria-label="声で入力する">${icon("mic")}</button></div><div class="form-foot"><button class="primary-btn">この町の話を見る</button><button type="button" class="text-btn" id="try-demo">架空の「青葉地区」で試す</button></div></form>`;
+  const steps = hearingSteps
+    .map(
+      (s, i) =>
+        `<fieldset class="hearing-step"><legend><span class="step-no">${i + 1}</span>${s.q}</legend><div class="chips">${s.options
+          .map(([v, l]) => {
+            const on = s.multi ? hearing[s.key].includes(v) : hearing[s.key] === v;
+            return `<label class="chip"><input type="${s.multi ? "checkbox" : "radio"}" name="h-${s.key}" value="${v}" ${on ? "checked" : ""}><span>${l}</span></label>`;
+          })
+          .join("")}</div></fieldset>`,
+    )
+    .join("");
+  const unknown = `<form class="path-panel" id="panel-unknown" role="tabpanel" aria-labelledby="tab-unknown"><p class="panel-lead">3つの質問から、合いそうな地域を挙げます。</p>${steps}<label class="label" for="hearing-note">ほかに気になること（任意）</label><div class="composer"><textarea id="hearing-note" placeholder="例：雪が多くても、昔ながらの祭りがある町がいい" maxlength="1000">${esc(hearing.note)}</textarea><button type="button" class="round" id="dictate" aria-label="声で入力する">${icon("mic")}</button></div><div class="form-foot"><button class="primary-btn">候補を見る</button></div></form>`;
   shell(
-    `<section class="start"><p class="eyebrow">土地の記憶に、会いにいこう。</p><h1>どんな町に、出会いたいですか。</h1><p class="intro">旅先を探す日も、新しい暮らしを想う日も。<br>あなたの気になることから、地域の語りにつなぎます。</p><form class="request-form" id="travel-form"><div class="composer"><label class="sr-only" for="travel-question">してみたい旅や暮らし</label><textarea id="travel-question" placeholder="海のそばで、地元の暮らしを知りたい" maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で相談を入力">${icon("mic")}</button><button class="round primary" aria-label="旅の相談を始める">${icon("send")}</button></div><p class="request-note">まだ行き先が決まっていなくても、大丈夫。</p></form><button class="text-btn handoff-link" data-page="home">行事の引き継ぎについて相談する →</button></section>`,
+    `<section class="hero"><h1>その町の昔を、<br>そこで暮らした人に聞く。</h1><p class="lead">生まれ育った町の行事のいわれも、これから住むかもしれない町の成り立ちも。地域の人が語り、本人が確かめた話を読むことができます。</p></section><section class="paths"><div class="path-tabs" role="tablist" aria-label="探し方">${tab("known", "知りたい町が決まっている", "住んでいた町、いま住む町")}${tab("unknown", "これから住む町を探している", "質問に答えて候補を見る")}</div>${path === "known" ? known : unknown}</section>`,
   );
-  $("#travel-form").onsubmit = (e) => {
+  document.querySelectorAll("[data-path]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        path = b.dataset.path;
+        render();
+        $(`#tab-${path}`)?.focus();
+      }),
+  );
+  $("#dictate").onclick = () => dictate($(path === "known" ? "#place-question" : "#hearing-note"));
+  if (path === "known") {
+    $("#panel-known").onsubmit = (e) => {
+      e.preventDefault();
+      const name = $("#place-input").value.trim();
+      if (!name) return toast("町や地区の名前を入力してください。");
+      openPlace(name, $("#place-question").value.trim());
+    };
+    $("#try-demo").onclick = () => openPlace("青葉地区", "");
+  } else {
+    $("#panel-unknown").onchange = readHearing;
+    $("#panel-unknown").onsubmit = (e) => {
+      e.preventDefault();
+      readHearing();
+      if (!hearing.env && !hearing.values.length && !hearing.area && !hearing.note.trim())
+        return toast("どれかひとつ、選ぶか入力してください。");
+      go("regions");
+    };
+  }
+}
+function readHearing() {
+  const form = $("#panel-unknown");
+  if (!form) return;
+  hearing.env = form.querySelector('[name="h-env"]:checked')?.value || "";
+  hearing.area = form.querySelector('[name="h-area"]:checked')?.value || "";
+  hearing.values = [...form.querySelectorAll('[name="h-values"]:checked')].map((x) => x.value);
+  hearing.note = $("#hearing-note").value;
+}
+function openPlace(name, question = "") {
+  placeName = name.slice(0, 80);
+  placeDraft = question;
+  go("place");
+}
+function placeRequests() {
+  const n = placeName.replace(/\s/g, "");
+  return state.requests.filter((r) => {
+    const e = String(r.place || r.event || "").replace(/\s/g, "");
+    return n && (e.includes(n) || n.includes(e.replace(/の.*$/, "")));
+  });
+}
+function placePage() {
+  if (!placeName) return go("welcome");
+  const records = placeRequests(),
+    confirmed = records.filter((r) => r.card),
+    waiting = records.filter((r) => !r.card),
+    fictional = /青葉/.test(placeName),
+    region = Object.values(regionInfo).find((r) => r.name === placeName);
+  const item = (r) =>
+    `<li><button class="story" data-request="${r.id}"><span class="story-q">${esc(r.question)}</span><span class="story-meta">${esc(r.speaker)}　${r.card ? "語り手が確認済み" : statuses[r.status]}</span></button></li>`;
+  shell(
+    `<div class="place-layout"><header class="place-name"><h1 lang="ja">${esc(placeName)}</h1><p>${fictional ? "デモ用の架空の地区" : region ? region.position : "地域の記録"}</p></header><div class="place-body"><section class="place-section"><h2>この町で残されたお話</h2>${confirmed.length ? `<ul class="story-list">${confirmed.map(item).join("")}</ul>` : `<p class="empty-note">${fictional ? "まだ確認済みのお話はありません。下で聞きたいことを送り、「話を残す」から語り手の役で答えると、流れを試せます。" : "この町のお話は、まだ記録されていません。知りたいことを送ると、次に地域の方へ聞き取るテーマになります。"}</p>`}${waiting.length ? `<h3 class="sub-h">聞き取りを待っている質問</h3><ul class="story-list is-waiting">${waiting.map(item).join("")}</ul>` : ""}</section><form class="place-section ask" id="place-ask"><h2>この町の人に聞きたいこと</h2><p class="small">町の歴史、通りや建物の名前の由来、行事のいわれなど。答えは、地域の人が語って本人が確かめた内容だけを載せます。</p><div class="composer"><label class="sr-only" for="place-q">聞きたいこと</label><textarea id="place-q" required maxlength="1000" placeholder="${fictional ? "雨の日、提灯はどこで準備するの？" : region ? `${region.topic}について、昔の様子を知りたい` : "この通りが昔どんな様子だったか知りたい"}">${esc(placeDraft)}</textarea><button type="button" class="round" id="dictate" aria-label="声で入力する">${icon("mic")}</button><button class="round primary" aria-label="質問を送る">${icon("send")}</button></div></form><section class="place-section place-links"><a class="secondary-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(region ? region.query : placeName)}" target="_blank" rel="noopener">地図で場所を見る</a><button class="secondary-btn" id="event-handoff">この町の行事の段取りを聞く</button></section></div></div>`,
+  );
+  $("#dictate").onclick = () => dictate($("#place-q"));
+  $("#place-q").oninput = (e) => (placeDraft = e.target.value);
+  $("#place-ask").onsubmit = (e) => {
     e.preventDefault();
-    const q = $("#travel-question").value;
-    const filter = /海|島|港|瀬戸内/.test(q)
-      ? "setouchi"
-      : /山|田舎|里|雪|東北/.test(q)
-        ? "tohoku"
-        : /町並み|商い|商店|関西|京都|大阪/.test(q)
-          ? "kansai"
-          : "all";
-    page = "regions";
-    regions(filter);
-    window.scrollTo(0, 0);
+    const q = $("#place-q").value;
+    const r = create(q, false, fictional ? DEMO.event : placeName, fictional ? DEMO.task : "町の歴史・暮らし");
+    if (r) {
+      r.place = placeName;
+      placeDraft = "";
+      save();
+      go("request");
+    }
   };
-  $("#dictate").onclick = () => dictate($("#travel-question"));
+  $("#event-handoff").onclick = () => {
+    homeEvent = fictional ? DEMO.event : placeName + "の行事";
+    go("home");
+  };
 }
 function home() {
+  const isDemo = homeEvent === DEMO.event;
   shell(
-    `<section class="start"><p class="eyebrow">土地の記憶を、明日の力に。</p><h1>準備で、困っていることは？</h1><p class="intro">初めて任された祭りの準備も、町の暮らしの決まりも。<br>あなたの疑問を、地域の経験者につなぎます。</p><form class="request-form" id="request-form"><div class="context"><span>青葉地区の夏祭り · 提灯の準備</span><details><summary>変更</summary><div class="context-edit"><label>行事・地域<input class="field" id="event" value="${DEMO.event}"></label><label>知りたい作業<input class="field" id="task" value="${DEMO.task}"></label></div></details></div><div class="composer"><label class="sr-only" for="question">地域の経験者に聞きたいこと</label><textarea id="question" placeholder="雨の日、提灯はどこで準備すればいい？" required maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で質問を入力">${icon("mic")}</button><button class="round primary" aria-label="質問を届ける">${icon("send")}</button></div><p class="request-note">まずは、ひとつの質問から。</p></form></section>`,
+    `<section class="hero hero-small"><h1>行事の段取りを、経験者に聞く。</h1><p class="lead">初めて任された祭りの準備も、町の暮らしの決まりも。疑問がそのまま、次の聞き取りのテーマになります。</p></section><form class="paths request-form" id="request-form"><div class="row-2"><label class="label">行事・地域<input class="field" id="event" value="${esc(homeEvent)}"></label><label class="label">知りたい作業<input class="field" id="task" value="${esc(isDemo ? DEMO.task : "")}" placeholder="例：神輿の準備"></label></div><label class="label" for="question">経験者に聞きたいこと</label><div class="composer"><textarea id="question" placeholder="${isDemo ? "雨の日、提灯はどこで準備すればいい？" : "例：当日の朝は、何時にどこへ集まればいい？"}" required maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で質問を入力">${icon("mic")}</button><button class="round primary" aria-label="質問を届ける">${icon("send")}</button></div><p class="small">まずは、ひとつの質問から。</p></form>`,
   );
   $("#request-form").onsubmit = (e) => {
     e.preventDefault();
-    if (create($("#question").value, false, $("#event").value, $("#task").value)) go("request");
+    if (create($("#question").value, false, $("#event").value, $("#task").value || "行事の準備")) go("request");
   };
   $("#dictate").onclick = () => dictate($("#question"));
 }
@@ -172,11 +305,15 @@ function create(question, sample = false, event = DEMO.event, task = DEMO.task) 
     return null;
   }
 }
+function stepper(n) {
+  const names = ["聞きたいこと", "話を聞く", "確かめて残す"];
+  return `<ol class="stepper" aria-label="聞き取りの流れ">${names.map((x, i) => `<li ${i + 1 === n ? 'aria-current="step"' : ""} class="${i + 1 < n ? "done" : ""}"><span>${i + 1}</span>${x}</li>`).join("")}</ol>`;
+}
 function requestPage() {
   const r = current();
   if (!r) return go("home");
   shell(
-    `<section class="page-header"><p class="eyebrow">01　聞きたいこと</p><h1>経験者に聞く準備ができました。</h1><p>本番では、地域の協力者と一緒に聞き取りを始めます。</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} / ${esc(r.task)}</p><h2>${esc(r.question)}</h2><p class="small">この質問を出発点に、場所・段取り・その理由を聞き取ります。分からないことは「未確認」として残します。</p><div class="dialog-actions"><button class="primary-btn" id="begin">経験者に聞く</button></div></article><section class="side-card"><h3>今回のデモ</h3><p class="small">架空の地域で流れを試せます。語り手はあなたが演じるか、用意した台詞を入力してください。実際に送信・依頼する機能はありません。</p></section></div>`,
+    `<section class="page-header">${stepper(1)}<h1>経験者に聞く準備ができました。</h1><p>本番では、地域の協力者と一緒に聞き取りを始めます。</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} / ${esc(r.task)}</p><h2>${esc(r.question)}</h2><p class="small">この質問を出発点に、場所・段取り・その理由を聞き取ります。分からないことは「未確認」として残します。</p><div class="dialog-actions"><button class="primary-btn" id="begin">経験者に聞く</button></div></article><section class="side-card"><h3>今回のデモ</h3><p class="small">架空の地域で流れを試せます。語り手はあなたが演じるか、用意した台詞を入力してください。実際に送信・依頼する機能はありません。</p></section></div>`,
   );
   $("#begin").onclick = beginInterview;
 }
@@ -212,13 +349,13 @@ function beginInterview() {
   go("interview");
 }
 function requestSide(r) {
-  return `<section class="side-card"><h3>若い担い手からの質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section>`;
+  return `<section class="side-card"><h3>届いている質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section>`;
 }
 function interview() {
   const r = current();
   if (!r) return go("home");
   shell(
-    `<section class="page-header"><p class="eyebrow">02　話を聞く</p><h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form"><div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="話すか、ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon("mic")}</button><button class="round primary" ${busy ? "disabled" : ""} aria-label="お話を伝える">${icon("send")}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div>${config.aiReady ? '<button type="button" class="text-btn" id="live">声で会話を続ける（最大5分）</button>' : ""}</form></section></div>`,
+    `<section class="page-header">${stepper(2)}<h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form"><div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="話すか、ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon("mic")}</button><button class="round primary" ${busy ? "disabled" : ""} aria-label="お話を伝える">${icon("send")}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div>${config.aiReady ? '<button type="button" class="text-btn" id="live">声で会話を続ける（最大5分）</button>' : ""}</form></section></div>`,
   );
   $("#speaker").onchange = (e) => {
     r.speaker = e.target.value;
@@ -295,14 +432,14 @@ function review() {
   if (!c) return go("request");
   const unknown = FACTS.filter(([k]) => c.facts[k].status === "unknown");
   shell(
-    `<section class="page-header"><p class="eyebrow">03　${draft ? "語り手と確認する" : "次の担い手に渡す"}</p><h1>${draft ? "この内容で、伝わりますか？" : "次の準備で、また使える。"}</h1><p>${draft ? "元のお話を確かめながら、必要なら書き直してください。" : "質問から聞き取った内容を、出どころと一緒に残しました。"}</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} · ${esc(r.speaker)}</p><h2>${esc(c.title)}</h2>${draft ? "" : '<p class="verified">語り手と確認済み</p><br>'}<div class="facts">${FACTS.map(
+    `<section class="page-header">${stepper(3)}<h1>${draft ? "この内容で、伝わりますか？" : "次の準備で、また使える。"}</h1><p>${draft ? "元のお話を確かめながら、必要なら書き直してください。" : "質問から聞き取った内容を、出どころと一緒に残しました。"}</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)}／${esc(r.speaker)}</p><h2>${esc(c.title)}</h2>${draft ? "" : '<p class="verified">語り手と確認済み</p><br>'}<div class="facts">${FACTS.map(
       ([k, label]) => {
         const f = c.facts[k];
-        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}${f.sourceIds.length ? `<button class="source-btn" data-source="${k}">元のお話を確かめる ↗</button>` : ""}</section>`;
+        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}${f.sourceIds.length ? `<button class="source-btn" data-source="${k}">元のお話を確かめる</button>` : ""}</section>`;
       },
     ).join(
       "",
-    )}</div></article><div class="review-sidebar"><section class="side-card"><h3>${draft ? "確認して残す" : "この手引きを使う"}</h3>${draft ? `<p class="small">人名・時刻・条件を確認してください。修正した内容も、確認時の追記として残ります。</p><label class="check"><input type="checkbox" id="confirm">語り手と内容を確認しました。未確認の項目は、そのまま残します。</label><button class="primary-btn full" id="save-card">確認して残す</button>` : `<p class="small">${new Date(c.confirmedAt).toLocaleDateString("ja-JP")} に確認<br>${r.sampleData ? "架空データでの体験です。" : ""}</p><div class="settings-buttons"><button class="primary-btn" id="ask-memory">この記憶に聞く</button><button class="secondary-btn" id="print">印刷・PDFにする</button><button class="secondary-btn" id="measure">探しやすさを測る</button></div>`}</section><section class="side-card"><h3>次に聞きたいこと</h3>${unknown.length ? `<ul class="unknown-list">${unknown.map(([, l]) => `<li>${l}</li>`).join("")}</ul>` : '<p class="small">今回の6項目はお話が揃いました。実施前に変更がないか確かめましょう。</p>'}<button class="text-btn" id="resume">前回の続きから話を聞く →</button></section></div></div>`,
+    )}</div></article><div class="review-sidebar"><section class="side-card"><h3>${draft ? "確認して残す" : "この手引きを使う"}</h3>${draft ? `<p class="small">人名・時刻・条件を確認してください。修正した内容も、確認時の追記として残ります。</p><label class="check"><input type="checkbox" id="confirm">語り手と内容を確認しました。未確認の項目は、そのまま残します。</label><button class="primary-btn full" id="save-card">確認して残す</button>` : `<p class="small">${new Date(c.confirmedAt).toLocaleDateString("ja-JP")} に確認<br>${r.sampleData ? "架空データでの体験です。" : ""}</p><div class="settings-buttons"><button class="primary-btn" id="ask-memory">この記憶に聞く</button><button class="secondary-btn" id="print">印刷・PDFにする</button><button class="secondary-btn" id="measure">探しやすさを測る</button></div>`}</section><section class="side-card"><h3>次に聞きたいこと</h3>${unknown.length ? `<ul class="unknown-list">${unknown.map(([, l]) => `<li>${l}</li>`).join("")}</ul>` : '<p class="small">今回の6項目はお話が揃いました。実施前に変更がないか確かめましょう。</p>'}<button class="text-btn" id="resume">前回の続きから話を聞く</button></section></div></div>`,
   );
   document.querySelectorAll("[data-source]").forEach(
     (b) =>
@@ -352,7 +489,7 @@ function knowledge() {
   const r = current();
   if (!r?.card) return go("home");
   shell(
-    `<section class="page-header"><p class="eyebrow">地域の記憶と話す</p><h1>あの人の経験に、いつでも聞ける。</h1><p>${esc(r.speaker)}が確認したお話から答えます。本人の代わりに判断することはできません。</p></section><section class="knowledge paper-card"><div id="memory-log"><p class="source-quote">${esc(r.task)}について、知りたいことはありますか？</p></div><form id="memory-form" class="composer"><label class="sr-only" for="memory-question">記憶に聞きたいこと</label><textarea id="memory-question" required placeholder="雨の日はどこで準備するの？"></textarea><button class="round primary" aria-label="記憶に質問する">${icon("send")}</button></form><button class="text-btn" id="back-card">確認済みの手引きを見る →</button></section>`,
+    `<section class="page-header"><h1>あの人の経験に、いつでも聞ける。</h1><p>${esc(r.speaker)}が確認したお話から答えます。本人の代わりに判断することはできません。</p></section><section class="knowledge paper-card"><div id="memory-log"><p class="source-quote">${esc(r.task)}について、知りたいことはありますか？</p></div><form id="memory-form" class="composer"><label class="sr-only" for="memory-question">記憶に聞きたいこと</label><textarea id="memory-question" required placeholder="雨の日はどこで準備するの？"></textarea><button class="round primary" aria-label="記憶に質問する">${icon("send")}</button></form><button class="text-btn" id="back-card">確認済みの手引きを見る</button></section>`,
   );
   $("#back-card").onclick = () => go("review");
   $("#memory-form").onsubmit = async (e) => {
@@ -437,61 +574,71 @@ async function startLive() {
 const regionInfo = {
   tohoku: {
     name: "東北の里山",
+    image: "satoyama",
     query: "東北地方",
-    hint: "山あいの暮らしや、受け継がれる祭りに触れたい方へ。",
+    hint: "山あいの田畑と、雪の季節を越えて受け継がれてきた祭りのある暮らし。",
     position: "日本の北東部",
     topic: "祭りや雪国の暮らし",
+    tags: { env: ["mountain"], values: ["festival", "food", "quiet"], words: /山|田舎|里|雪|東北|田んぼ|農/ },
   },
   kansai: {
     name: "関西の町並み",
+    image: "kansai",
     query: "関西地方",
-    hint: "町の商い、人の集まる場所の記憶を知りたい方へ。",
+    hint: "古い通りと商店街、人が集まる場所の記憶が残る町なかの暮らし。",
     position: "本州の中西部",
     topic: "商店街や町の行事",
+    tags: { env: ["town"], values: ["trade", "festival", "family"], words: /町並み|商い|商店|関西|京都|大阪|通り/ },
   },
   setouchi: {
     name: "瀬戸内の海辺",
+    image: "setouchi",
     query: "瀬戸内海",
-    hint: "海のそばの日常や、島の暮らしに関心がある方へ。",
+    hint: "港と島をつなぐ船、漁や海の恵みとともにある穏やかな日常。",
     position: "本州・四国・九州に囲まれた海域",
     topic: "海辺の日常や島の記憶",
+    tags: { env: ["sea"], values: ["food", "quiet", "family"], words: /海|島|港|瀬戸内|漁|船/ },
   },
 };
-function regions(filter = "all") {
+const answerLabel = (key, v) => hearingSteps.find((s) => s.key === key).options.find(([x]) => x === v)?.[1];
+function matchRegions() {
+  return Object.entries(regionInfo)
+    .map(([k, r]) => {
+      const reasons = [];
+      if (r.tags.env.includes(hearing.env)) reasons.push(answerLabel("env", hearing.env));
+      for (const v of hearing.values) if (r.tags.values.includes(v)) reasons.push(answerLabel("values", v));
+      if (hearing.area === k) reasons.push(answerLabel("area", k) + "方面");
+      if (hearing.note && r.tags.words.test(hearing.note)) reasons.push("書いてくださった希望");
+      const blocked = hearing.area && !["any", "other", k].includes(hearing.area);
+      return { k, r, reasons, score: blocked ? -1 : reasons.length };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+function regions() {
+  const list = matchRegions(),
+    fits = list.filter((x) => x.score > 0),
+    shown = fits.length ? fits : list.filter((x) => x.score >= 0),
+    answered = [
+      answerLabel("env", hearing.env),
+      ...hearing.values.map((v) => answerLabel("values", v)),
+      hearing.area ? answerLabel("area", hearing.area) : "",
+    ].filter(Boolean);
   shell(
-    `<section class="page-header"><p class="eyebrow">旅の案内役</p><h1>どんな町に、出会いたいですか。</h1><p>まずは大まかな地域から。風景と位置を見て、気になる話を探しましょう。</p></section><div class="region-content"><form id="region-form" class="region-search"><label for="region-select">まず、気になるのは</label><select class="field" id="region-select"><option value="all">まだ決まっていない</option><option value="tohoku" ${filter === "tohoku" ? "selected" : ""}>里山・祭りのある暮らし</option><option value="kansai" ${filter === "kansai" ? "selected" : ""}>町並み・商いの記憶</option><option value="setouchi" ${filter === "setouchi" ? "selected" : ""}>海辺・島の日常</option></select><button class="primary-btn">合いそうな地域を見る</button></form><p class="small region-note">地域を絞る流れのデモです。取材済みの語り部はまだ登録されていません。</p><div class="region-grid">${Object.entries(
-      regionInfo,
-    )
-      .filter(([k]) => filter === "all" || filter === k)
+    `<section class="hero hero-small"><h1>合いそうな地域の候補</h1><p class="lead">${answered.length ? `「${answered.map(esc).join("」「")}」をもとに選びました。` : "お答えをもとに選びました。"}${fits.length ? "" : "ぴったり合う候補がなかったため、登録済みの地域をすべて表示しています。"}</p><button class="text-btn" data-page="welcome" id="redo">答えを変える</button></section>${hearing.area === "other" ? '<p class="notice">「そのほか」の方面は、まだ地域の記録がありません。取材が進んだら候補に加わります。</p>' : ""}<div class="region-grid">${shown
       .map(
-        ([k, r]) =>
-          `<article class="region-card"><div class="region-photo ${k}">${`<img src="images/${k === "tohoku" ? "satoyama" : k}.png" alt="${r.name}の風景イメージ">`}<span>風景イメージ・AI生成</span></div><div class="region-body"><p class="meta">${r.position}</p><h2>${r.name}</h2><p>${r.hint}</p><div class="region-links"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.query)}" target="_blank" rel="noopener">地図で位置を見る ↗</a><button class="secondary-btn" data-region="${k}">この地域の話を探す</button></div></div></article>`,
+        ({ k, r, reasons }) =>
+          `<article class="region-card"><figure class="region-photo"><img src="images/${r.image}.jpg" alt="${r.name}の風景イメージ" loading="lazy" width="640" height="427"><figcaption>AIで作った風景イメージ</figcaption></figure><div class="region-body"><p class="meta">${r.position}</p><h2>${r.name}</h2><p>${r.hint}</p>${reasons.length ? `<p class="reasons"><span>合う点</span>${reasons.map((x) => `<em>${esc(x)}</em>`).join("")}</p>` : ""}<div class="region-links"><button class="primary-btn" data-region="${k}">この地域の話を見る</button><a class="text-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.query)}" target="_blank" rel="noopener">地図で見る</a></div></div></article>`,
       )
       .join(
         "",
-      )}</div><p class="small region-note">写真は実在の特定の町・語り手を紹介するものではありません。地域の情報は取材・確認後に追加します。</p></div>`,
+      )}</div><p class="small region-note">候補は体験用の簡単な振り分けです。写真は実在の特定の町や語り手を紹介するものではありません。</p>`,
   );
-  $("#region-form").onsubmit = (e) => {
-    e.preventDefault();
-    regions($("#region-select").value);
+  $("#redo").onclick = () => {
+    path = "unknown";
+    go("welcome");
   };
   document.querySelectorAll("[data-region]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        const r = regionInfo[b.dataset.region];
-        modal(
-          `<h2>${r.name}で、聞いてみたいこと</h2><p>現在、この地域の取材済みのお話はありません。${r.topic}について、知りたいことを残せます。</p><label for="regional-question">聞きたいこと</label><textarea class="field" id="regional-question" placeholder="この土地の祭りは、どうやって準備するの？"></textarea><div class="dialog-actions"><button class="secondary-btn" data-close>戻る</button><button class="primary-btn" id="regional-save">質問を残す</button></div>`,
-          () => {
-            $("#regional-save").onclick = () => {
-              const req = create($("#regional-question").value, false, r.name, "地域の暮らし");
-              if (req) {
-                $("#dialog").close();
-                go("request");
-              }
-            };
-          },
-        );
-      }),
+    (b) => (b.onclick = () => openPlace(regionInfo[b.dataset.region].name)),
   );
 }
 function settings() {
@@ -569,7 +716,7 @@ function measurementSetup() {
 function testPage() {
   const r = current();
   shell(
-    `<section class="page-header"><p class="eyebrow">実測テスト</p><h1>資料を見て、4つの質問に答えてください。</h1><p>分からない場合は「未確認」で構いません。回答を提出するまでの時間を測ります。</p></section><div class="test-layout"><section class="paper-card test-source"><h2>${test.condition === "card" ? "確認済みの手引き" : "聞き取りの全文"}</h2>${test.condition === "card" ? FACTS.map(([k, l]) => `<div class="fact"><p class="fact-label">${l}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p></div>`).join("") : r.turns.map((t) => `<p class="small">${t.role === "user" ? esc(r.speaker) : "聞き役"}</p><p class="source-quote">${esc(t.text)}</p>`).join("")}</section><form class="paper-card" id="answers">${[
+    `<section class="page-header"><h1>資料を見て、4つの質問に答えてください。</h1><p>分からない場合は「未確認」で構いません。回答を提出するまでの時間を測ります。</p></section><div class="test-layout"><section class="paper-card test-source"><h2>${test.condition === "card" ? "確認済みの手引き" : "聞き取りの全文"}</h2>${test.condition === "card" ? FACTS.map(([k, l]) => `<div class="fact"><p class="fact-label">${l}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p></div>`).join("") : r.turns.map((t) => `<p class="small">${t.role === "user" ? esc(r.speaker) : "聞き役"}</p><p class="source-quote">${esc(t.text)}</p>`).join("")}</section><form class="paper-card" id="answers">${[
       ["when", "何時に集まりますか？"],
       ["where", "雨の日は、どこで準備しますか？"],
       ["why", "その場所で準備するのはなぜですか？"],
@@ -627,7 +774,7 @@ function metrics() {
   const m = state.measurements,
     confirmed = state.requests.filter((r) => r.status === "confirmed");
   shell(
-    `<section class="page-header"><p class="eyebrow">実際に測った記録</p><h1>次の担い手が、使えるか。</h1><p>数値が空欄なのは、まだ測っていないためです。チーム内テストと当事者テストは分けて判断します。</p></section><section class="metrics"><div class="metric-row"><article class="metric-tile"><span>全文から探す時間・中央値</span><strong>${median(m.filter((x) => x.condition === "transcript").map((x) => x.seconds))}</strong><span>${m.filter((x) => x.condition === "transcript").length}件</span></article><article class="metric-tile"><span>手引きから探す時間・中央値</span><strong>${median(m.filter((x) => x.condition === "card").map((x) => x.seconds))}</strong><span>${m.filter((x) => x.condition === "card").length}件</span></article><article class="metric-tile"><span>語り手の確認時間・中央値</span><strong>${median(confirmed.map((r) => r.metrics.reviewSeconds))}</strong><span>${confirmed.length}件・修正合計${confirmed.reduce((n, r) => n + (r.metrics.corrections || 0), 0)}項目</span></article></div><div class="metric-controls"><button class="secondary-btn" id="new-test">この手引きで計測する</button><button class="text-btn" id="csv">測定CSVを保存 ↗</button></div><div class="table-wrap"><table><thead><tr><th>参加者</th><th>区分</th><th>資料</th><th>時間</th><th>正答</th><th>影響する誤り</th><th>内容</th><th>採点</th></tr></thead><tbody>${m.map((x) => `<tr><td>${esc(x.participant)}</td><td>${x.role === "team" ? "チーム内" : "当事者"}</td><td>${x.condition === "card" ? "手引き" : "全文"}</td><td>${x.seconds}秒</td><td>${x.reviewed ? x.score + "/4" : "未採点"}</td><td>${x.reviewed ? x.criticalErrors : "—"}</td><td>${x.sampleData ? "架空データ" : "入力データ"}</td><td><button class="text-btn" data-score="${x.id}">確認する</button></td></tr>`).join("") || '<tr><td colspan="8" class="empty">測定結果はまだありません。</td></tr>'}</tbody></table></div></section>`,
+    `<section class="page-header"><h1>次の担い手が、使えるか。</h1><p>数値が空欄なのは、まだ測っていないためです。チーム内テストと当事者テストは分けて判断します。</p></section><section class="metrics"><div class="metric-row"><article class="metric-tile"><span>全文から探す時間・中央値</span><strong>${median(m.filter((x) => x.condition === "transcript").map((x) => x.seconds))}</strong><span>${m.filter((x) => x.condition === "transcript").length}件</span></article><article class="metric-tile"><span>手引きから探す時間・中央値</span><strong>${median(m.filter((x) => x.condition === "card").map((x) => x.seconds))}</strong><span>${m.filter((x) => x.condition === "card").length}件</span></article><article class="metric-tile"><span>語り手の確認時間・中央値</span><strong>${median(confirmed.map((r) => r.metrics.reviewSeconds))}</strong><span>${confirmed.length}件・修正合計${confirmed.reduce((n, r) => n + (r.metrics.corrections || 0), 0)}項目</span></article></div><div class="metric-controls"><button class="secondary-btn" id="new-test">この手引きで計測する</button><button class="text-btn" id="csv">測定CSVを保存</button></div><div class="table-wrap"><table><thead><tr><th>参加者</th><th>区分</th><th>資料</th><th>時間</th><th>正答</th><th>影響する誤り</th><th>内容</th><th>採点</th></tr></thead><tbody>${m.map((x) => `<tr><td>${esc(x.participant)}</td><td>${x.role === "team" ? "チーム内" : "当事者"}</td><td>${x.condition === "card" ? "手引き" : "全文"}</td><td>${x.seconds}秒</td><td>${x.reviewed ? x.score + "/4" : "未採点"}</td><td>${x.reviewed ? x.criticalErrors : "—"}</td><td>${x.sampleData ? "架空データ" : "入力データ"}</td><td><button class="text-btn" data-score="${x.id}">確認する</button></td></tr>`).join("") || '<tr><td colspan="8" class="empty">測定結果はまだありません。</td></tr>'}</tbody></table></div></section>`,
   );
   $("#new-test").onclick = measurementSetup;
   $("#csv").onclick = exportCSV;
