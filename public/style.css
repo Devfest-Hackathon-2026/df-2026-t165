@@ -1,29 +1,33 @@
 /* ツギテ — 継手（蟻継ぎ）。藍の部材＝語り手と町の過去、檜の部材＝次の担い手。 */
 :root {
-  --paper: #f3f4f0;
-  --paper-2: #e8ebe6;
-  --sheet: #fbfbf8;
-  --ink: #1c2526;
-  --ink-2: #4c5a5c;
-  --ink-3: #6f7b7c;
-  --ai: #1e3f66;
-  --ai-deep: #152e4b;
-  --ai-wash: #e3e9f0;
-  --hinoki: #b7894a;
-  --hinoki-light: #d9b27a;
-  --hinoki-wash: #f4e9d6;
-  --contour: #cdd6d2;
-  --rule: #d9ddd8;
+  --paper: #f3ede1;
+  --paper-2: #e9e1d0;
+  --sheet: #fbf7ef;
+  --ink: #2b2723;
+  --ink-2: #5b534b;
+  --ink-3: #776d63;
+  --ai: #223a5e;
+  --ai-deep: #172a45;
+  --ai-wash: #e3e5e8;
+  --hinoki: #b8863b;
+  --hinoki-light: #d8b06e;
+  --hinoki-wash: #f3e6cc;
+  --contour: #d6cbb6;
+  --rule: #e2d9c7;
   --yamabuki: #8a5a12;
-  --yamabuki-wash: #f4e9d6;
-  --koke: #3f6b4c;
-  --koke-wash: #e1eadf;
+  --yamabuki-wash: #f3e6cc;
+  --koke: #4a6b46;
+  --koke-wash: #e4e8d8;
+  --shu: #b94a2c;
+  --shu-deep: #9a3a20;
+  --shu-wash: #f5e0d7;
+  --washi: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .37 0 0 0 0 .25 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --mincho: "Shippori Mincho B1", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --gothic: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
   --r-s: 8px;
   --r-m: 14px;
   --side: 264px;
-  --focus: 0 0 0 3px #fbfbf8, 0 0 0 5px var(--ai);
+  --focus: 0 0 0 3px #fbf7ef, 0 0 0 5px var(--ai);
 }
 * {
   box-sizing: border-box;
@@ -2135,7 +2139,7 @@ h3 {
 /* 上部バー */
 .topbar {
   padding: 12px 28px 12px 16px;
-  border-bottom: 1px solid #e1e4df;
+  border-bottom: 1px solid var(--rule);
   background: var(--paper);
 }
 .product {
@@ -2503,7 +2507,7 @@ h3 {
   gap: 4px;
   padding: 4px;
   border-radius: 12px;
-  background: #e6e9e4;
+  background: #e8dfcd;
 }
 .seg {
   min-height: 40px;
@@ -2767,5 +2771,306 @@ h3 {
   .hub-card,
   .choice {
     transition: none;
+  }
+}
+
+/* =========================================================
+   伝統の雰囲気：和紙、青海波、祭りの提灯
+   ========================================================= */
+body {
+  background-color: var(--paper);
+  background-image: var(--washi);
+}
+aside {
+  background-color: var(--paper-2);
+  background-image: var(--washi);
+}
+.topbar {
+  background: transparent;
+  border-bottom-color: var(--rule);
+}
+/* 青海波（せいがいは）：重なる波の文様。縁起の良い「穏やかな暮らしが続く」意味 */
+.seigaiha,
+.wave-band,
+.footer::before,
+.town-band::before {
+  --w1: #223a5e;
+  --w2: #34507a;
+  background-color: var(--w1);
+  background-image:
+    radial-gradient(circle at 100% 150%, var(--w1) 24%, var(--w2) 24%, var(--w2) 28%, var(--w1) 28%, var(--w1) 36%, var(--w2) 36%, var(--w2) 40%, transparent 40%, transparent),
+    radial-gradient(circle at 0 150%, var(--w1) 24%, var(--w2) 24%, var(--w2) 28%, var(--w1) 28%, var(--w1) 36%, var(--w2) 36%, var(--w2) 40%, transparent 40%, transparent),
+    radial-gradient(circle at 50% 100%, var(--w2) 10%, var(--w1) 10%, var(--w1) 23%, var(--w2) 23%, var(--w2) 30%, var(--w1) 30%, var(--w1) 43%, var(--w2) 43%, var(--w2) 50%, var(--w1) 50%, var(--w1) 63%, var(--w2) 63%, var(--w2) 71%, transparent 71%, transparent),
+    radial-gradient(circle at 100% 50%, var(--w2) 5%, var(--w1) 5%, var(--w1) 15%, var(--w2) 15%, var(--w2) 20%, var(--w1) 20%, var(--w1) 29%, var(--w2) 29%, var(--w2) 34%, var(--w1) 34%, var(--w1) 44%, var(--w2) 44%, var(--w2) 49%, transparent 49%, transparent),
+    radial-gradient(circle at 0 50%, var(--w2) 5%, var(--w1) 5%, var(--w1) 15%, var(--w2) 15%, var(--w2) 20%, var(--w1) 20%, var(--w1) 29%, var(--w2) 29%, var(--w2) 34%, var(--w1) 34%, var(--w1) 44%, var(--w2) 44%, var(--w2) 49%, transparent 49%, transparent);
+  background-size: 64px 32px;
+}
+@keyframes waveDrift {
+  to {
+    background-position: 64px 0;
+  }
+}
+.wave-band {
+  height: 56px;
+  margin-top: 48px;
+  border-radius: 14px;
+  animation: waveDrift 12s linear infinite;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.footer {
+  position: relative;
+  border-top: 0;
+  padding-top: 34px;
+}
+.footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 14px;
+  opacity: 0.9;
+}
+
+/* 祭りの提灯：ゆっくり揺れ、灯りがほのかに明滅する */
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-2.6deg);
+  }
+  50% {
+    transform: rotate(2.6deg);
+  }
+}
+@keyframes glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(232, 150, 70, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(232, 150, 70, 0.55));
+  }
+}
+@keyframes drop {
+  from {
+    transform: translateY(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.lanterns {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.lantern-swing {
+  transform-box: view-box;
+  animation: sway 4.2s ease-in-out var(--d) infinite;
+}
+.lantern {
+  animation: drop 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--d) * 0.6) both;
+}
+.lantern-swing {
+  transform-origin: 50% 0;
+  transform-box: fill-box;
+}
+.lantern-body {
+  animation: glow 3.6s ease-in-out var(--d) infinite;
+}
+
+/* ホームの舞台 */
+.hub {
+  max-width: 940px;
+  padding-top: 8px;
+}
+.hub-hero {
+  position: relative;
+  padding: 0 0 8px;
+  border-radius: 22px;
+  background-image:
+    linear-gradient(180deg, rgba(243, 237, 225, 0.55) 0%, rgba(243, 237, 225, 0.92) 55%, var(--paper) 100%),
+    var(--hero-photo, none);
+  background-size: cover;
+  background-position: center 30%;
+}
+.hub-hero .lanterns {
+  max-width: 900px;
+  margin: 0 auto -18px;
+}
+.hub-head {
+  padding: 0 8px;
+}
+.intake-hello {
+  color: var(--shu);
+}
+.hub-card.is-main,
+.hub-card:first-child {
+  background-color: var(--ai);
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 60%);
+  border-color: var(--ai);
+}
+.hub-card {
+  position: relative;
+  overflow: hidden;
+}
+.hub-card::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 14px solid var(--hinoki);
+  opacity: 0.12;
+  transition: transform 0.4s ease;
+}
+.hub-card:hover::after {
+  transform: scale(1.15);
+}
+.hub-card:not(.is-main) {
+  background: var(--sheet);
+}
+.town-chip::before {
+  background: var(--shu);
+}
+.pill {
+  background: var(--shu-wash);
+  color: var(--shu-deep);
+}
+
+/* 質問：選んだ札は紺、今いる段は朱 */
+.progress span.now {
+  background: var(--shu);
+}
+.chip input:checked + span,
+.chip-btn:active {
+  background: var(--ai);
+  border-color: var(--ai);
+}
+.choice:hover {
+  box-shadow: inset 4px 0 0 var(--shu);
+}
+.typed::after {
+  background: var(--shu);
+}
+
+/* 町の帯：紺地に青海波、右上に提灯 */
+.town-band {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.town-band::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.15) 35%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, 0.15) 35%, #000 100%);
+  animation: waveDrift 16s linear infinite;
+}
+.band-lanterns {
+  position: absolute;
+  right: 18px;
+  top: -14px;
+  width: 260px;
+  pointer-events: none;
+}
+.band-lanterns path {
+  stroke: #d8b06e;
+}
+.band-actions {
+  position: relative;
+  margin-top: 64px;
+}
+.band-btn.is-hinoki {
+  background: var(--shu);
+  border-color: var(--shu);
+  color: #fff;
+}
+.band-btn.is-hinoki:hover {
+  background: var(--shu-deep);
+}
+.band-kicker {
+  color: var(--hinoki-light);
+}
+
+/* チャット：和紙の白、回答に金茶の細い縁 */
+.town-chat,
+.chat {
+  background: var(--sheet);
+}
+.town-chat .answer {
+  background: #fffdf8;
+  border-color: var(--rule);
+  box-shadow: inset 3px 0 0 var(--hinoki);
+}
+.material {
+  background: var(--hinoki-wash);
+}
+.cite {
+  background: var(--shu-wash);
+  color: var(--shu-deep);
+}
+.cite:hover {
+  background: var(--shu);
+  color: #fff;
+}
+.cite-no {
+  background: var(--shu-wash);
+  color: var(--shu-deep);
+}
+.typing span {
+  background: var(--shu);
+}
+.round.primary {
+  background: var(--shu);
+}
+.round.primary:hover {
+  background: var(--shu-deep);
+}
+.primary-btn {
+  background: var(--ai);
+}
+
+@media (max-width: 960px) {
+  .band-lanterns {
+    width: 180px;
+    right: 6px;
+    top: -10px;
+  }
+  .band-actions {
+    margin-top: 12px;
+  }
+  .town-band {
+    padding-top: 22px;
+  }
+  .wave-band {
+    height: 40px;
+    margin-top: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lantern,
+  .lantern-swing,
+  .lantern-body,
+  .wave-band,
+  .town-band::before {
+    animation: none !important;
+  }
+}
+@media (min-width: 961px) {
+  .town-band {
+    min-height: 168px;
+  }
+  .band-lanterns {
+    width: 240px;
+    right: 28px;
   }
 }
