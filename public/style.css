@@ -1556,3 +1556,226 @@ dialog label {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- 町のチャット ---------- */
+.town-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+  padding-top: 8px;
+}
+.town-chat {
+  min-height: calc(100vh - 140px);
+  max-height: calc(100vh - 110px);
+}
+.town-chat .chat-top h1 {
+  font-size: 20px;
+}
+.town-chat .composer textarea {
+  min-height: 44px;
+}
+.answer {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--r-m);
+  border-top-left-radius: 2px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+}
+.town-chat .msg.assistant {
+  max-width: 92%;
+}
+.answer-text {
+  line-height: 1.9;
+}
+.cite {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin: 0 1px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--ai-wash);
+  color: var(--ai);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 0.35em;
+  line-height: 1;
+}
+.cite:hover {
+  background: var(--ai);
+  color: #fff;
+}
+.answer-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.answer-sources {
+  padding-top: 12px;
+  border-top: 1px dashed var(--contour);
+}
+.cite-list,
+.material-list,
+.contact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.cite-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--r-s);
+  text-align: left;
+}
+.cite-row:hover {
+  background: var(--paper);
+}
+.cite-no {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--ai-wash);
+  color: var(--ai);
+  font-size: 12px;
+  font-weight: 700;
+}
+.cite-row strong,
+.material strong,
+.contact-list strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cite-row small,
+.material small,
+.contact-list small,
+.contact-list span {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.6;
+}
+.material {
+  padding: 10px 12px;
+  border-left: 3px solid var(--yamabuki);
+  background: var(--yamabuki-wash);
+  border-radius: 0 var(--r-s) var(--r-s) 0;
+}
+.material-kind {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--yamabuki);
+}
+.material-list.compact .material {
+  background: transparent;
+  padding: 6px 10px;
+}
+.answer-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.suggest .choice-sm {
+  border-style: solid;
+  background: var(--paper);
+  color: var(--ai);
+}
+.town-side {
+  display: grid;
+  gap: 16px;
+}
+.town-name {
+  padding: 22px 20px;
+  border-radius: var(--r-m);
+  background-color: var(--ai);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160' fill='none' stroke='%23ffffff' stroke-opacity='.14' stroke-width='1.2'%3E%3Cpath d='M-20 40c50-30 90 30 140 0s90-40 140-10'/%3E%3Cpath d='M-20 78c50-30 90 34 140 4s90-44 140-14'/%3E%3Cpath d='M30 140c30-40 80-50 110-20s20 70-30 80'/%3E%3C/svg%3E");
+  color: #fff;
+}
+.town-name h2 {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+.town-name p {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+.contact-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.contact-list li:last-child {
+  border-bottom: 0;
+}
+.contact-list a {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.contact-list a[target] {
+  font-size: 13px;
+}
+.side-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+@media (max-width: 960px) {
+  .town-layout {
+    grid-template-columns: 1fr;
+  }
+  .town-chat {
+    min-height: 70vh;
+    max-height: 80vh;
+  }
+}
+.jump-contacts {
+  display: none;
+  font-size: 13px;
+}
+@media (max-width: 960px) {
+  .jump-contacts {
+    display: inline;
+  }
+}
+@media (max-width: 820px) {
+  .town-chat .chat-top {
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 12px 16px;
+  }
+  .town-chat .chat-top h1 {
+    font-size: 18px;
+    flex: 1 1 100%;
+  }
+  .town-chat .chat-top small {
+    display: none;
+  }
+  .town-chat .chat-log {
+    padding: 16px;
+  }
+}
+.town-chat .chat-log {
+  position: relative;
+}
