@@ -1,45 +1,663 @@
-import {FACTS,DEMO,validateRequest,localCard,localFollowup,reviewCard,assessAnswers,answerKeys} from './domain.js';
-const $=s=>document.querySelector(s), esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icon=n=>`<img class="icon" src="icons/${n}.svg" alt="">`;
-const key='tsugite-workspace-v1';let wid=localStorage.getItem('tsugite-id')||crypto.randomUUID();localStorage.setItem('tsugite-id',wid);
-let state;try{state=JSON.parse(localStorage.getItem(key))}catch{}state||={requests:[],measurements:[]};
-let config={aiReady:false,storage:'browser',requiresCode:false},page='welcome',active=state.requests[0]?.id,code=sessionStorage.getItem('tsugite-access')||'',busy=false,test=null,saveMessage='この端末に保存';
-const current=()=>state.requests.find(r=>r.id===active);
-const headers=()=>({'content-type':'application/json','x-workspace-id':wid,'x-demo-access-code':code});
-async function api(route,data){const res=await fetch('/api/'+route,{method:data===undefined?'GET':'POST',headers:headers(),...(data===undefined?{}:{body:JSON.stringify(data)})});const out=await res.json();if(!res.ok)throw Error(out.error||'通信を確認してください');return out}
-function toast(text){$('.toast')?.remove();const n=document.createElement('div');n.className='toast';n.setAttribute('role','status');n.textContent=text;document.body.append(n);setTimeout(()=>n.remove(),5000)}
-let saveChain=Promise.resolve();function save(){localStorage.setItem(key,JSON.stringify(state));if(config.storage!=='browser'){const snapshot=JSON.stringify(state);saveChain=saveChain.then(async()=>{try{const r=await fetch('/api/workspace/'+wid,{method:'PUT',headers:headers(),body:snapshot});if(!r.ok)throw Error();saveMessage=config.storage==='firestore'?'Firestoreに保存':'この端末とサーバーに保存'}catch{saveMessage='端末に保存済み・サーバー保存は未完了';toast(saveMessage)}})}}
-function go(p){page=p;document.body.classList.remove('menu-open');render();window.scrollTo(0,0)}
-const statuses={requested:'聞き取り待ち',interview:'聞き取り中',draft:'内容を確認',confirmed:'確認済み'};
-function shell(content){$('#app').innerHTML=`<aside><button class="close-menu" aria-label="メニューを閉じる">${icon('close')}</button><div class="brand">ツギテ</div><p class="brand-note">町の記憶を、次の担い手へ。</p><button class="nav-new" data-page="welcome">${icon('plus')}新しく相談する</button><button class="nav-mode" id="record-entry">${icon('mic')}話を残す</button><button class="nav-mode" data-page="regions">${icon('compass')}地域を探す</button><details class="side-history"><summary>最近のお話（${state.requests.length}）</summary>${state.requests.map(r=>`<button class="history" data-request="${r.id}">${esc(r.question)}<span>${esc(r.event)} · ${statuses[r.status]||''}</span></button>`).join('')}</details><div class="side-bottom"><button class="settings" id="settings">${icon('settings')} 設定</button><span class="side-label">${config.aiReady?'Google AI 接続設定あり':'体験モード'}<br>生の音声は保存しません</span></div></aside><main><header class="topbar"><div class="product"><button class="mobile-menu" aria-label="メニューを開く">${icon('menu')}</button>ツギテ</div><div class="status"><span class="status-dot"></span>${config.aiReady?'AI接続設定あり':'体験モード'}</div></header>${content}<footer class="footer">青葉地区・田中さんは架空です。初期のお話はデモ用の創作です。<br>${esc(saveMessage)} · ${config.aiReady?'Geminiの生成結果は、語り手と確認してから利用します。':'現在の聞き取りと整理は体験用のルール処理です。'}</footer></main><dialog id="dialog"></dialog>`;
- document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>go(b.dataset.page));document.querySelectorAll('[data-request]').forEach(b=>b.onclick=()=>{active=b.dataset.request;go(current().status==='requested'?'request':current().status==='interview'?'interview':'review')});$('.mobile-menu').onclick=()=>document.body.classList.add('menu-open');$('.close-menu').onclick=()=>document.body.classList.remove('menu-open');$('#settings').onclick=settings;$('#record-entry').onclick=()=>{if(!current())create(DEMO.question,true);beginInterview()};}
-function modal(html,bind=()=>{}){const d=$('#dialog');d.innerHTML=html;d.showModal();bind(d);d.querySelector('[data-close]')?.addEventListener('click',()=>d.close());d.onclick=e=>{if(e.target===d)d.close()}}
-function render(){if(page==='welcome')welcome();else if(page==='home')home();else if(page==='regions')regions();else if(page==='request')requestPage();else if(page==='interview')interview();else if(page==='review')review();else if(page==='metrics')metrics();else if(page==='test')testPage();else if(page==='knowledge')knowledge()}
-function welcome(){shell(`<section class="start"><p class="eyebrow">土地の記憶に、会いにいこう。</p><h1>どんな町に、出会いたいですか。</h1><p class="intro">旅先を探す日も、新しい暮らしを想う日も。<br>あなたの気になることから、地域の語りにつなぎます。</p><form class="request-form" id="travel-form"><div class="composer"><label class="sr-only" for="travel-question">してみたい旅や暮らし</label><textarea id="travel-question" placeholder="海のそばで、地元の暮らしを知りたい" maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で相談を入力">${icon('mic')}</button><button class="round primary" aria-label="旅の相談を始める">${icon('send')}</button></div><p class="request-note">まだ行き先が決まっていなくても、大丈夫。</p></form><button class="text-btn handoff-link" data-page="home">行事の引き継ぎについて相談する →</button></section>`);$('#travel-form').onsubmit=e=>{e.preventDefault();const q=$('#travel-question').value;const filter=/海|島|港|瀬戸内/.test(q)?'setouchi':/山|田舎|里|雪|東北/.test(q)?'tohoku':/町並み|商い|商店|関西|京都|大阪/.test(q)?'kansai':'all';page='regions';regions(filter);window.scrollTo(0,0)};$('#dictate').onclick=()=>dictate($('#travel-question'))}
-function home(){shell(`<section class="start"><p class="eyebrow">土地の記憶を、明日の力に。</p><h1>準備で、困っていることは？</h1><p class="intro">初めて任された祭りの準備も、町の暮らしの決まりも。<br>あなたの疑問を、地域の経験者につなぎます。</p><form class="request-form" id="request-form"><div class="context"><span>青葉地区の夏祭り · 提灯の準備</span><details><summary>変更</summary><div class="context-edit"><label>行事・地域<input class="field" id="event" value="${DEMO.event}"></label><label>知りたい作業<input class="field" id="task" value="${DEMO.task}"></label></div></details></div><div class="composer"><label class="sr-only" for="question">地域の経験者に聞きたいこと</label><textarea id="question" placeholder="雨の日、提灯はどこで準備すればいい？" required maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で質問を入力">${icon('mic')}</button><button class="round primary" aria-label="質問を届ける">${icon('send')}</button></div><p class="request-note">まずは、ひとつの質問から。</p></form></section>`);$('#request-form').onsubmit=e=>{e.preventDefault();if(create($('#question').value,false,$('#event').value,$('#task').value))go('request')};$('#dictate').onclick=()=>dictate($('#question'))}
-function create(question,sample=false,event=DEMO.event,task=DEMO.task){try{const r=validateRequest({question,sampleData:sample,event,task,speaker:DEMO.speaker});state.requests.unshift(r);active=r.id;save();return r}catch(e){toast(e.message);return null}}
-function requestPage(){const r=current();if(!r)return go('home');shell(`<section class="page-header"><p class="eyebrow">01　聞きたいこと</p><h1>経験者に聞く準備ができました。</h1><p>本番では、地域の協力者と一緒に聞き取りを始めます。</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} / ${esc(r.task)}</p><h2>${esc(r.question)}</h2><p class="small">この質問を出発点に、場所・段取り・その理由を聞き取ります。分からないことは「未確認」として残します。</p><div class="dialog-actions"><button class="primary-btn" id="begin">経験者に聞く</button></div></article><section class="side-card"><h3>今回のデモ</h3><p class="small">架空の地域で流れを試せます。語り手はあなたが演じるか、用意した台詞を入力してください。実際に送信・依頼する機能はありません。</p></section></div>`);$('#begin').onclick=beginInterview}
-function turn(role,text){return {id:crypto.randomUUID(),role,text,at:new Date().toISOString()}}
-function beginInterview(){let r=current();if(!r)return;const previous=r.card;r.status='interview';if(r.pendingQuestions?.length)r.turns.push(turn('assistant','次の担い手から追加の質問です。「'+r.pendingQuestions.pop()+'」について教えていただけますか？'));else if(!r.turns.length)r.turns.push(turn('assistant',localFollowup(r,[])));else if(previous)r.turns.push(turn('assistant',`前回は「${previous.title}」のお話を伺いました。${FACTS.filter(([k])=>previous.facts[k].status==='unknown').map(([,l])=>l).join('・')||'その後の変更'}について、続けて教えていただけますか？`));r.metrics.interviewStartedAt||=Date.now();save();go('interview')}
-function requestSide(r){return `<section class="side-card"><h3>若い担い手からの質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section>`}
-function interview(){const r=current();if(!r)return go('home');shell(`<section class="page-header"><p class="eyebrow">02　話を聞く</p><h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady?'Gemini':'体験用の聞き役'}</small></header><div class="chat-log" aria-live="polite">${r.turns.map(t=>`<div class="msg ${t.role}"><p class="who">${t.role==='user'?esc(r.speaker):'ツギテ'}</p><p class="bubble">${esc(t.text)}</p></div>`).join('')}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form"><div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="話すか、ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon('mic')}</button><button class="round primary" ${busy?'disabled':''} aria-label="お話を伝える">${icon('send')}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button><button type="button" class="secondary-btn" id="finish" ${busy?'disabled':''}>手引きの下書きを作る</button></div>${config.aiReady?'<button type="button" class="text-btn" id="live">声で会話を続ける（最大5分）</button>':''}</form></section></div>`);
- $('#speaker').onchange=e=>{r.speaker=e.target.value;save()};$('.chat-log').scrollTop=$('.chat-log').scrollHeight;$('#talk-form').onsubmit=async e=>{e.preventDefault();await say($('#utterance').value)};$('#dictate').onclick=()=>dictate($('#utterance'));$('#sample').onclick=()=>{const n=r.turns.filter(t=>t.role==='user').length;$('#utterance').value=DEMO.lines[n%DEMO.lines.length];r.sampleData=true;toast('架空の台詞です。「お話を伝える」で入力できます。')};$('#finish').onclick=finish;$('#live')?.addEventListener('click',startLive)}
-async function say(text){if(busy||!text.trim())return;const r=current();r.turns.push(turn('user',text.trim()));busy=true;save();render();try{const response=config.aiReady?await api('followup',{request:{question:r.question,event:r.event,task:r.task},turns:r.turns,previousCard:r.card||null}):{text:localFollowup(r,r.turns)};r.turns.push(turn('assistant',response.text));if(response.usage)r.metrics.lastUsage=response.usage;save()}catch(e){toast(e.message)}finally{busy=false;render()}}
-async function finish(){const r=current();if(!r.turns.some(t=>t.role==='user'))return toast('まず、語り手のお話をひとつ入力してください。');if(busy)return;busy=true;render();try{const out=config.aiReady?await api('card',{request:{event:r.event,task:r.task,question:r.question},turns:r.turns}):{card:localCard(r.turns)};r.draft=out.card;r.draft.title=r.task+'の手引き';r.status='draft';r.metrics.reviewStartedAt=Date.now();save();page='review'}catch(e){toast(e.message)}finally{busy=false;render()}}
-function review(){const r=current();if(!r)return go('home');const draft=r.status!=='confirmed',c=draft?r.draft:r.card;if(!c)return go('request');const unknown=FACTS.filter(([k])=>c.facts[k].status==='unknown');shell(`<section class="page-header"><p class="eyebrow">03　${draft?'語り手と確認する':'次の担い手に渡す'}</p><h1>${draft?'この内容で、伝わりますか？':'次の準備で、また使える。'}</h1><p>${draft?'元のお話を確かめながら、必要なら書き直してください。':'質問から聞き取った内容を、出どころと一緒に残しました。'}</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} · ${esc(r.speaker)}</p><h2>${esc(c.title)}</h2>${draft?'':'<p class="verified">語り手と確認済み</p><br>'}<div class="facts">${FACTS.map(([k,label])=>{const f=c.facts[k];return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status==='unknown'?'<span>未確認</span>':''}</label>${draft?`<textarea class="field" id="fact-${k}">${esc(f.value)}</textarea>`:`<p class="fact-value ${f.status==='unknown'?'unknown':''}">${esc(f.value)}</p>`}${f.sourceIds.length?`<button class="source-btn" data-source="${k}">元のお話を確かめる ↗</button>`:''}</section>`}).join('')}</div></article><div class="review-sidebar"><section class="side-card"><h3>${draft?'確認して残す':'この手引きを使う'}</h3>${draft?`<p class="small">人名・時刻・条件を確認してください。修正した内容も、確認時の追記として残ります。</p><label class="check"><input type="checkbox" id="confirm">語り手と内容を確認しました。未確認の項目は、そのまま残します。</label><button class="primary-btn full" id="save-card">確認して残す</button>`:`<p class="small">${new Date(c.confirmedAt).toLocaleDateString('ja-JP')} に確認<br>${r.sampleData?'架空データでの体験です。':''}</p><div class="settings-buttons"><button class="primary-btn" id="ask-memory">この記憶に聞く</button><button class="secondary-btn" id="print">印刷・PDFにする</button><button class="secondary-btn" id="measure">探しやすさを測る</button></div>`}</section><section class="side-card"><h3>次に聞きたいこと</h3>${unknown.length?`<ul class="unknown-list">${unknown.map(([,l])=>`<li>${l}</li>`).join('')}</ul>`:'<p class="small">今回の6項目はお話が揃いました。実施前に変更がないか確かめましょう。</p>'}<button class="text-btn" id="resume">前回の続きから話を聞く →</button></section></div></div>`);
- document.querySelectorAll('[data-source]').forEach(b=>b.onclick=()=>{const f=c.facts[b.dataset.source];modal(`<h2>この内容の出どころ</h2><p>${esc(f.label)}：${esc(f.value)}</p>${f.sourceIds.map(id=>{const t=r.turns.find(t=>t.id===id);return `<blockquote class="source-quote">${esc(t?.text||'元発言が見つかりません')}</blockquote>`}).join('')}<div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`) });$('#resume').onclick=beginInterview;
- $('#save-card')?.addEventListener('click',()=>{if(!$('#confirm').checked)return toast('語り手と内容を確認してから、チェックを入れてください。');let corrections=0;for(const[k]of FACTS){const value=$('#fact-'+k).value.trim()||'未確認';if(value!==c.facts[k].value){corrections++;if(value==='未確認')c.facts[k]={...c.facts[k],value,sourceIds:[],status:'unknown'};else{const t=turn('user',`確認時の追記（${c.facts[k].label}）：${value}`);r.turns.push(t);c.facts[k]={...c.facts[k],value,sourceIds:[t.id],status:'stated'}}}}r.card=reviewCard(r,{...c,confirmed:true});r.status='confirmed';r.metrics.reviewSeconds=Math.round((Date.now()-r.metrics.reviewStartedAt)/1000);r.metrics.corrections=corrections;save();render();toast('確認した手引きを残しました。')});$('#ask-memory')?.addEventListener('click',()=>go('knowledge'));$('#print')?.addEventListener('click',()=>print());$('#measure')?.addEventListener('click',measurementSetup)}
-function knowledge(){const r=current();if(!r?.card)return go('home');shell(`<section class="page-header"><p class="eyebrow">地域の記憶と話す</p><h1>あの人の経験に、いつでも聞ける。</h1><p>${esc(r.speaker)}が確認したお話から答えます。本人の代わりに判断することはできません。</p></section><section class="knowledge paper-card"><div id="memory-log"><p class="source-quote">${esc(r.task)}について、知りたいことはありますか？</p></div><form id="memory-form" class="composer"><label class="sr-only" for="memory-question">記憶に聞きたいこと</label><textarea id="memory-question" required placeholder="雨の日はどこで準備するの？"></textarea><button class="round primary" aria-label="記憶に質問する">${icon('send')}</button></form><button class="text-btn" id="back-card">確認済みの手引きを見る →</button></section>`);$('#back-card').onclick=()=>go('review');$('#memory-form').onsubmit=async e=>{e.preventDefault();const q=$('#memory-question').value.trim();if(!q)return;const button=$('#memory-form button');button.disabled=true;try{const result=config.aiReady?await api('answer',{question:q,card:r.card}):{keys:answerKeys(q,r.card)};const keys=result.keys||[];const log=$('#memory-log');log.innerHTML+=`<p class="memory-q">${esc(q)}</p>${keys.length?keys.map(k=>`<section class="memory-a"><p class="fact-label">${esc(r.card.facts[k].label)}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p><blockquote class="small">${r.card.facts[k].sourceIds.map(id=>esc(r.turns.find(t=>t.id===id)?.text||'')).join('<br>')}</blockquote></section>`).join(''):`<p class="source-quote">そのことは、まだ記録されていません。次の聞き取りで確認しましょう。</p><button class="secondary-btn" id="queue-question">この質問を次の聞き取りへ</button>`}`;$('#memory-question').value='';$('#queue-question')?.addEventListener('click',()=>{r.pendingQuestions||=[];r.pendingQuestions.push(q);save();toast('次の聞き取りで、この質問から始めます。');$('#queue-question').disabled=true})}catch(err){toast(err.message)}finally{button.disabled=false}}}
-function dictate(target){const Speech=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Speech)return toast('このブラウザでは音声入力を利用できません。文字で入力できます。');const r=new Speech();r.lang='ja-JP';r.interimResults=false;r.onresult=e=>{target.value+=(target.value?'\n':'')+e.results[0][0].transcript;target.focus()};r.onerror=()=>toast('音声を取得できませんでした。マイクの許可を確認してください。');r.start();toast('お話しください。音声認識はブラウザの機能を利用します。')}
-async function startLive(){try{const {startConversation}=await import('./live.js');const r=current();$('#live').disabled=true;await startConversation({getToken:()=>api('live-token',{}),request:r,onTurn:(role,text)=>{r.turns.push(turn(role,text));save();const p=document.createElement('div');p.className='msg '+role;p.innerHTML=`<p class="who">${role==='user'?esc(r.speaker):'ツギテ'}</p><p class="bubble">${esc(text)}</p>`;$('.chat-log')?.append(p);if($('.chat-log'))$('.chat-log').scrollTop=$('.chat-log').scrollHeight},onStatus:(text,stop)=>{const n=$('#live-status');if(!n)return;n.className='live-indicator';n.textContent=text;if(stop){const b=document.createElement('button');b.className='secondary-btn';b.textContent='会話を終了';b.onclick=stop;n.append(b)}},onEnd:()=>render()})}catch(e){toast(e.message);render()}}
-const regionInfo={tohoku:{name:'東北の里山',query:'東北地方',hint:'山あいの暮らしや、受け継がれる祭りに触れたい方へ。',position:'日本の北東部',topic:'祭りや雪国の暮らし'},kansai:{name:'関西の町並み',query:'関西地方',hint:'町の商い、人の集まる場所の記憶を知りたい方へ。',position:'本州の中西部',topic:'商店街や町の行事'},setouchi:{name:'瀬戸内の海辺',query:'瀬戸内海',hint:'海のそばの日常や、島の暮らしに関心がある方へ。',position:'本州・四国・九州に囲まれた海域',topic:'海辺の日常や島の記憶'}};
-function regions(filter='all'){shell(`<section class="page-header"><p class="eyebrow">旅の案内役</p><h1>どんな町に、出会いたいですか。</h1><p>まずは大まかな地域から。風景と位置を見て、気になる話を探しましょう。</p></section><div class="region-content"><form id="region-form" class="region-search"><label for="region-select">まず、気になるのは</label><select class="field" id="region-select"><option value="all">まだ決まっていない</option value="tohoku" ${filter==='tohoku'?'selected':''}>里山・祭りのある暮らし</option><option value="kansai" ${filter==='kansai'?'selected':''}>町並み・商いの記憶</option><option value="setouchi" ${filter==='setouchi'?'selected':''}>海辺・島の日常</option></select><button class="primary-btn">合いそうな地域を見る</button></form><p class="small region-note">地域を絞る流れのデモです。取材済みの語り部はまだ登録されていません。</p><div class="region-grid">${Object.entries(regionInfo).filter(([k])=>filter==='all'||filter===k).map(([k,r])=>`<article class="region-card"><div class="region-photo ${k}">${`<img src="images/${k==='tohoku'?'satoyama':k}.png" alt="${r.name}の風景イメージ">`}<span>風景イメージ・AI生成</span></div><div class="region-body"><p class="meta">${r.position}</p><h2>${r.name}</h2><p>${r.hint}</p><div class="region-links"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.query)}" target="_blank" rel="noopener">地図で位置を見る ↗</a><button class="secondary-btn" data-region="${k}">この地域の話を探す</button></div></div></article>`).join('')}</div><p class="small region-note">写真は実在の特定の町・語り手を紹介するものではありません。地域の情報は取材・確認後に追加します。</p></div>`);$('#region-form').onsubmit=e=>{e.preventDefault();regions($('#region-select').value)};document.querySelectorAll('[data-region]').forEach(b=>b.onclick=()=>{const r=regionInfo[b.dataset.region];modal(`<h2>${r.name}で、聞いてみたいこと</h2><p>現在、この地域の取材済みのお話はありません。${r.topic}について、知りたいことを残せます。</p><label for="regional-question">聞きたいこと</label><textarea class="field" id="regional-question" placeholder="この土地の祭りは、どうやって準備するの？"></textarea><div class="dialog-actions"><button class="secondary-btn" data-close>戻る</button><button class="primary-btn" id="regional-save">質問を残す</button></div>`,()=>{$('#regional-save').onclick=()=>{const req=create($('#regional-question').value,false,r.name,'地域の暮らし');if(req){$('#dialog').close();go('request')}}})})}
-function settings(){modal(`<h2>会話と保存の設定</h2><p>${config.aiReady?'Google AIの接続設定があります。利用時の通信で接続を確認します。':'Google AIは未接続です。体験モードでは、この端末で流れを試せます。'}<br>保存：${esc(saveMessage)}</p>${config.requiresCode?'<label>チームのデモアクセスコード<input class="field" type="password" id="access" autocomplete="off"></label><button class="secondary-btn" id="set-access">接続する</button>':''}<details class="settings-group"><summary>検証と記録</summary><div class="settings-buttons"><button class="secondary-btn" id="metrics">測定結果を見る</button><button class="secondary-btn" id="export-json">記録を保存</button><button class="secondary-btn" id="export-csv">測定CSVを保存</button></div><p>測定は実際に操作した結果だけ記録します。架空データ・チーム内テストも区別します。</p></details><div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`,()=>{$('#metrics').onclick=()=>{$('#dialog').close();go('metrics')};$('#export-json').onclick=()=>download('ツギテ_記録.json',JSON.stringify(state,null,2),'application/json');$('#export-csv').onclick=exportCSV;$('#set-access')?.addEventListener('click',async()=>{code=$('#access').value;sessionStorage.setItem('tsugite-access',code);try{await api('workspace/'+wid);save();toast('接続を確認しました。')}catch(e){toast(e.message)}})})}
-function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
-function exportCSV(){const cols=['id','participant','role','condition','seconds','score','criticalErrors','reviewed','sampleData'];const rows=state.measurements.map(m=>cols.map(k=>'"'+String(m[k]??'').replaceAll('"','""')+'"').join(','));download('ツギテ_測定.csv','\uFEFF'+cols.join(',')+'\n'+rows.join('\n'),'text/csv;charset=utf-8')}
-function measurementSetup(){const r=current();if(!r?.card)return toast('先に手引きを確認してください。');modal(`<h2>探しやすさを測る</h2><p>4つの質問に答える時間と正答数を測ります。比較は別の協力者、または出題順を変えて行ってください。同じ内容の2回目は記憶の影響を受けます。</p><label>参加者の記号<input class="field" id="participant" placeholder="P01（実名は不要）"></label><label>協力者の区分<select class="field" id="participant-role"><option value="team">チーム内テスト</option><option value="stakeholder">実際の行事の担い手</option></select></label><label>見るもの<select class="field" id="condition"><option value="transcript">聞き取りの全文</option><option value="card">確認済みの手引き</option></select></label><div class="dialog-actions"><button class="secondary-btn" data-close>戻る</button><button class="primary-btn" id="start-test">計測を始める</button></div>`,()=>{$('#start-test').onclick=()=>{if(!$('#participant').value.trim())return toast('参加者の記号を入力してください。');test={id:crypto.randomUUID(),requestId:r.id,participant:$('#participant').value.trim(),role:$('#participant-role').value,condition:$('#condition').value,startedAt:Date.now(),sampleData:r.sampleData};$('#dialog').close();go('test')}})}
-function testPage(){const r=current();shell(`<section class="page-header"><p class="eyebrow">実測テスト</p><h1>資料を見て、4つの質問に答えてください。</h1><p>分からない場合は「未確認」で構いません。回答を提出するまでの時間を測ります。</p></section><div class="test-layout"><section class="paper-card test-source"><h2>${test.condition==='card'?'確認済みの手引き':'聞き取りの全文'}</h2>${test.condition==='card'?FACTS.map(([k,l])=>`<div class="fact"><p class="fact-label">${l}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p></div>`).join(''):r.turns.map(t=>`<p class="small">${t.role==='user'?esc(r.speaker):'聞き役'}</p><p class="source-quote">${esc(t.text)}</p>`).join('')}</section><form class="paper-card" id="answers">${[['when','何時に集まりますか？'],['where','雨の日は、どこで準備しますか？'],['why','その場所で準備するのはなぜですか？'],['contact','外につるすか迷ったら、誰に確認しますか？']].map(([k,l])=>`<div class="test-question"><label for="answer-${k}">${l}</label><textarea class="field" id="answer-${k}" required></textarea></div>`).join('')}<button class="primary-btn full">回答を提出して計測を止める</button></form></div>`);$('#answers').onsubmit=e=>{e.preventDefault();const answers=Object.fromEntries(['when','where','why','contact'].map(k=>[k,$('#answer-'+k).value]));const m={...test,seconds:Math.round((Date.now()-test.startedAt)/1000),answers:assessAnswers(r.card,answers),reviewed:false,createdAt:new Date().toISOString()};state.measurements.push(m);save();test=null;go('metrics');score(m)}}
-function score(m){modal(`<h2>回答を人が確認する</h2><p>元の手引きと照らして採点します。未確認を断定した場合も、誤りとして扱ってください。</p>${m.answers.map((a,i)=>`<label>${esc(a.label)}</label><p>期待する内容：${esc(a.expected)}<br>回答：${esc(a.answer)}</p><select class="field" id="score-${i}"><option value="">採点してください</option><option value="1">正しい</option><option value="0">誤り・不足</option></select>`).join('')}<label>安全や当日の実施に影響する誤りの数<input class="field" id="critical" type="number" min="0" max="4" value="0"></label><div class="dialog-actions"><button class="secondary-btn" data-close>後で採点</button><button class="primary-btn" id="score-save">採点を保存</button></div>`,()=>{$('#score-save').onclick=()=>{const scores=m.answers.map((_,i)=>$('#score-'+i).value);if(scores.some(x=>x===''))return toast('4問とも採点してください。');m.score=scores.reduce((n,x)=>n+Number(x),0);m.criticalErrors=Number($('#critical').value);m.reviewed=true;save();$('#dialog').close();render()}})}
-function median(values){if(!values.length)return '—';const v=values.toSorted((a,b)=>a-b),n=v.length;return Math.round(n%2?v[(n-1)/2]:(v[n/2-1]+v[n/2])/2)+'秒'}
-function metrics(){const m=state.measurements,confirmed=state.requests.filter(r=>r.status==='confirmed');shell(`<section class="page-header"><p class="eyebrow">実際に測った記録</p><h1>次の担い手が、使えるか。</h1><p>数値が空欄なのは、まだ測っていないためです。チーム内テストと当事者テストは分けて判断します。</p></section><section class="metrics"><div class="metric-row"><article class="metric-tile"><span>全文から探す時間・中央値</span><strong>${median(m.filter(x=>x.condition==='transcript').map(x=>x.seconds))}</strong><span>${m.filter(x=>x.condition==='transcript').length}件</span></article><article class="metric-tile"><span>手引きから探す時間・中央値</span><strong>${median(m.filter(x=>x.condition==='card').map(x=>x.seconds))}</strong><span>${m.filter(x=>x.condition==='card').length}件</span></article><article class="metric-tile"><span>語り手の確認時間・中央値</span><strong>${median(confirmed.map(r=>r.metrics.reviewSeconds))}</strong><span>${confirmed.length}件・修正合計${confirmed.reduce((n,r)=>n+(r.metrics.corrections||0),0)}項目</span></article></div><div class="metric-controls"><button class="secondary-btn" id="new-test">この手引きで計測する</button><button class="text-btn" id="csv">測定CSVを保存 ↗</button></div><div class="table-wrap"><table><thead><tr><th>参加者</th><th>区分</th><th>資料</th><th>時間</th><th>正答</th><th>影響する誤り</th><th>内容</th><th>採点</th></tr></thead><tbody>${m.map(x=>`<tr><td>${esc(x.participant)}</td><td>${x.role==='team'?'チーム内':'当事者'}</td><td>${x.condition==='card'?'手引き':'全文'}</td><td>${x.seconds}秒</td><td>${x.reviewed?x.score+'/4':'未採点'}</td><td>${x.reviewed?x.criticalErrors:'—'}</td><td>${x.sampleData?'架空データ':'入力データ'}</td><td><button class="text-btn" data-score="${x.id}">確認する</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">測定結果はまだありません。</td></tr>'}</tbody></table></div></section>`);$('#new-test').onclick=measurementSetup;$('#csv').onclick=exportCSV;document.querySelectorAll('[data-score]').forEach(b=>b.onclick=()=>score(m.find(x=>x.id===b.dataset.score)))}
-render();(async()=>{try{config=await api('config');if(config.storage!=='browser'&&(!config.requiresCode||code)){const saved=await api('workspace/'+wid);if(saved.data&&state.requests.length===0){state=saved.data;active=state.requests[0]?.id;localStorage.setItem(key,JSON.stringify(state))}}saveMessage=config.storage==='firestore'?'Firestoreと端末に保存':config.storage==='browser'?'この端末のブラウザに保存':'この端末とサーバーに保存';render()}catch{if(config.storage==='browser'){saveMessage='この端末のブラウザに保存';render()}else toast('サーバー保存は未接続です。設定を確認してください。')}})();
+import {
+  FACTS,
+  DEMO,
+  validateRequest,
+  localCard,
+  localFollowup,
+  reviewCard,
+  assessAnswers,
+  answerKeys,
+} from "./domain.js";
+const $ = (s) => document.querySelector(s),
+  esc = (v) =>
+    String(v ?? "").replace(
+      /[&<>"']/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+    );
+const icon = (n) => `<img class="icon" src="icons/${n}.svg" alt="">`;
+const key = "tsugite-workspace-v1";
+let wid = localStorage.getItem("tsugite-id") || crypto.randomUUID();
+localStorage.setItem("tsugite-id", wid);
+let state;
+try {
+  state = JSON.parse(localStorage.getItem(key));
+} catch {}
+state ||= { requests: [], measurements: [] };
+let config = { aiReady: false, storage: "browser", requiresCode: false },
+  page = "welcome",
+  active = state.requests[0]?.id,
+  code = sessionStorage.getItem("tsugite-access") || "",
+  busy = false,
+  test = null,
+  saveMessage = "この端末に保存";
+const current = () => state.requests.find((r) => r.id === active);
+const headers = () => ({
+  "content-type": "application/json",
+  "x-workspace-id": wid,
+  "x-demo-access-code": code,
+});
+async function api(route, data) {
+  const res = await fetch("/api/" + route, {
+    method: data === undefined ? "GET" : "POST",
+    headers: headers(),
+    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+  });
+  const out = await res.json();
+  if (!res.ok) throw Error(out.error || "通信を確認してください");
+  return out;
+}
+function toast(text) {
+  $(".toast")?.remove();
+  const n = document.createElement("div");
+  n.className = "toast";
+  n.setAttribute("role", "status");
+  n.textContent = text;
+  document.body.append(n);
+  setTimeout(() => n.remove(), 5000);
+}
+let saveChain = Promise.resolve();
+function save() {
+  localStorage.setItem(key, JSON.stringify(state));
+  if (config.storage !== "browser") {
+    const snapshot = JSON.stringify(state);
+    saveChain = saveChain.then(async () => {
+      try {
+        const r = await fetch("/api/workspace/" + wid, { method: "PUT", headers: headers(), body: snapshot });
+        if (!r.ok) throw Error();
+        saveMessage = config.storage === "firestore" ? "Firestoreに保存" : "この端末とサーバーに保存";
+      } catch {
+        saveMessage = "端末に保存済み・サーバー保存は未完了";
+        toast(saveMessage);
+      }
+    });
+  }
+}
+function go(p) {
+  page = p;
+  document.body.classList.remove("menu-open");
+  render();
+  window.scrollTo(0, 0);
+}
+const statuses = {
+  requested: "聞き取り待ち",
+  interview: "聞き取り中",
+  draft: "内容を確認",
+  confirmed: "確認済み",
+};
+function shell(content) {
+  $("#app").innerHTML =
+    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><div class="brand">ツギテ</div><p class="brand-note">町の記憶を、次の担い手へ。</p><button class="nav-new" data-page="welcome">${icon("plus")}新しく相談する</button><button class="nav-mode" id="record-entry">${icon("mic")}話を残す</button><button class="nav-mode" data-page="regions">${icon("compass")}地域を探す</button><details class="side-history"><summary>最近のお話（${state.requests.length}）</summary>${state.requests.map((r) => `<button class="history" data-request="${r.id}">${esc(r.question)}<span>${esc(r.event)} · ${statuses[r.status] || ""}</span></button>`).join("")}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")} 設定</button><span class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード"}<br>生の音声は保存しません</span></div></aside><main><header class="topbar"><div class="product"><button class="mobile-menu" aria-label="メニューを開く">${icon("menu")}</button>ツギテ</div><div class="status"><span class="status-dot"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</div></header>${content}<footer class="footer">青葉地区・田中さんは架空です。初期のお話はデモ用の創作です。<br>${esc(saveMessage)} · ${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</footer></main><dialog id="dialog"></dialog>`;
+  document.querySelectorAll("[data-page]").forEach((b) => (b.onclick = () => go(b.dataset.page)));
+  document.querySelectorAll("[data-request]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        active = b.dataset.request;
+        go(
+          current().status === "requested"
+            ? "request"
+            : current().status === "interview"
+              ? "interview"
+              : "review",
+        );
+      }),
+  );
+  $(".mobile-menu").onclick = () => document.body.classList.add("menu-open");
+  $(".close-menu").onclick = () => document.body.classList.remove("menu-open");
+  $("#settings").onclick = settings;
+  $("#record-entry").onclick = () => {
+    if (!current()) create(DEMO.question, true);
+    beginInterview();
+  };
+}
+function modal(html, bind = () => {}) {
+  const d = $("#dialog");
+  d.innerHTML = html;
+  d.showModal();
+  bind(d);
+  d.querySelector("[data-close]")?.addEventListener("click", () => d.close());
+  d.onclick = (e) => {
+    if (e.target === d) d.close();
+  };
+}
+function render() {
+  if (page === "welcome") welcome();
+  else if (page === "home") home();
+  else if (page === "regions") regions();
+  else if (page === "request") requestPage();
+  else if (page === "interview") interview();
+  else if (page === "review") review();
+  else if (page === "metrics") metrics();
+  else if (page === "test") testPage();
+  else if (page === "knowledge") knowledge();
+}
+function welcome() {
+  shell(
+    `<section class="start"><p class="eyebrow">土地の記憶に、会いにいこう。</p><h1>どんな町に、出会いたいですか。</h1><p class="intro">旅先を探す日も、新しい暮らしを想う日も。<br>あなたの気になることから、地域の語りにつなぎます。</p><form class="request-form" id="travel-form"><div class="composer"><label class="sr-only" for="travel-question">してみたい旅や暮らし</label><textarea id="travel-question" placeholder="海のそばで、地元の暮らしを知りたい" maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で相談を入力">${icon("mic")}</button><button class="round primary" aria-label="旅の相談を始める">${icon("send")}</button></div><p class="request-note">まだ行き先が決まっていなくても、大丈夫。</p></form><button class="text-btn handoff-link" data-page="home">行事の引き継ぎについて相談する →</button></section>`,
+  );
+  $("#travel-form").onsubmit = (e) => {
+    e.preventDefault();
+    const q = $("#travel-question").value;
+    const filter = /海|島|港|瀬戸内/.test(q)
+      ? "setouchi"
+      : /山|田舎|里|雪|東北/.test(q)
+        ? "tohoku"
+        : /町並み|商い|商店|関西|京都|大阪/.test(q)
+          ? "kansai"
+          : "all";
+    page = "regions";
+    regions(filter);
+    window.scrollTo(0, 0);
+  };
+  $("#dictate").onclick = () => dictate($("#travel-question"));
+}
+function home() {
+  shell(
+    `<section class="start"><p class="eyebrow">土地の記憶を、明日の力に。</p><h1>準備で、困っていることは？</h1><p class="intro">初めて任された祭りの準備も、町の暮らしの決まりも。<br>あなたの疑問を、地域の経験者につなぎます。</p><form class="request-form" id="request-form"><div class="context"><span>青葉地区の夏祭り · 提灯の準備</span><details><summary>変更</summary><div class="context-edit"><label>行事・地域<input class="field" id="event" value="${DEMO.event}"></label><label>知りたい作業<input class="field" id="task" value="${DEMO.task}"></label></div></details></div><div class="composer"><label class="sr-only" for="question">地域の経験者に聞きたいこと</label><textarea id="question" placeholder="雨の日、提灯はどこで準備すればいい？" required maxlength="1000"></textarea><button type="button" class="round" id="dictate" aria-label="声で質問を入力">${icon("mic")}</button><button class="round primary" aria-label="質問を届ける">${icon("send")}</button></div><p class="request-note">まずは、ひとつの質問から。</p></form></section>`,
+  );
+  $("#request-form").onsubmit = (e) => {
+    e.preventDefault();
+    if (create($("#question").value, false, $("#event").value, $("#task").value)) go("request");
+  };
+  $("#dictate").onclick = () => dictate($("#question"));
+}
+function create(question, sample = false, event = DEMO.event, task = DEMO.task) {
+  try {
+    const r = validateRequest({ question, sampleData: sample, event, task, speaker: DEMO.speaker });
+    state.requests.unshift(r);
+    active = r.id;
+    save();
+    return r;
+  } catch (e) {
+    toast(e.message);
+    return null;
+  }
+}
+function requestPage() {
+  const r = current();
+  if (!r) return go("home");
+  shell(
+    `<section class="page-header"><p class="eyebrow">01　聞きたいこと</p><h1>経験者に聞く準備ができました。</h1><p>本番では、地域の協力者と一緒に聞き取りを始めます。</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} / ${esc(r.task)}</p><h2>${esc(r.question)}</h2><p class="small">この質問を出発点に、場所・段取り・その理由を聞き取ります。分からないことは「未確認」として残します。</p><div class="dialog-actions"><button class="primary-btn" id="begin">経験者に聞く</button></div></article><section class="side-card"><h3>今回のデモ</h3><p class="small">架空の地域で流れを試せます。語り手はあなたが演じるか、用意した台詞を入力してください。実際に送信・依頼する機能はありません。</p></section></div>`,
+  );
+  $("#begin").onclick = beginInterview;
+}
+function turn(role, text) {
+  return { id: crypto.randomUUID(), role, text, at: new Date().toISOString() };
+}
+function beginInterview() {
+  let r = current();
+  if (!r) return;
+  const previous = r.card;
+  r.status = "interview";
+  if (r.pendingQuestions?.length)
+    r.turns.push(
+      turn(
+        "assistant",
+        "次の担い手から追加の質問です。「" + r.pendingQuestions.pop() + "」について教えていただけますか？",
+      ),
+    );
+  else if (!r.turns.length) r.turns.push(turn("assistant", localFollowup(r, [])));
+  else if (previous)
+    r.turns.push(
+      turn(
+        "assistant",
+        `前回は「${previous.title}」のお話を伺いました。${
+          FACTS.filter(([k]) => previous.facts[k].status === "unknown")
+            .map(([, l]) => l)
+            .join("・") || "その後の変更"
+        }について、続けて教えていただけますか？`,
+      ),
+    );
+  r.metrics.interviewStartedAt ||= Date.now();
+  save();
+  go("interview");
+}
+function requestSide(r) {
+  return `<section class="side-card"><h3>若い担い手からの質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section>`;
+}
+function interview() {
+  const r = current();
+  if (!r) return go("home");
+  shell(
+    `<section class="page-header"><p class="eyebrow">02　話を聞く</p><h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form"><div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="話すか、ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon("mic")}</button><button class="round primary" ${busy ? "disabled" : ""} aria-label="お話を伝える">${icon("send")}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div>${config.aiReady ? '<button type="button" class="text-btn" id="live">声で会話を続ける（最大5分）</button>' : ""}</form></section></div>`,
+  );
+  $("#speaker").onchange = (e) => {
+    r.speaker = e.target.value;
+    save();
+  };
+  $(".chat-log").scrollTop = $(".chat-log").scrollHeight;
+  $("#talk-form").onsubmit = async (e) => {
+    e.preventDefault();
+    await say($("#utterance").value);
+  };
+  $("#dictate").onclick = () => dictate($("#utterance"));
+  $("#sample").onclick = () => {
+    const n = r.turns.filter((t) => t.role === "user").length;
+    $("#utterance").value = DEMO.lines[n % DEMO.lines.length];
+    r.sampleData = true;
+    toast("架空の台詞です。「お話を伝える」で入力できます。");
+  };
+  $("#finish").onclick = finish;
+  $("#live")?.addEventListener("click", startLive);
+}
+async function say(text) {
+  if (busy || !text.trim()) return;
+  const r = current();
+  r.turns.push(turn("user", text.trim()));
+  busy = true;
+  save();
+  render();
+  try {
+    const response = config.aiReady
+      ? await api("followup", {
+          request: { question: r.question, event: r.event, task: r.task },
+          turns: r.turns,
+          previousCard: r.card || null,
+        })
+      : { text: localFollowup(r, r.turns) };
+    r.turns.push(turn("assistant", response.text));
+    if (response.usage) r.metrics.lastUsage = response.usage;
+    save();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    busy = false;
+    render();
+  }
+}
+async function finish() {
+  const r = current();
+  if (!r.turns.some((t) => t.role === "user")) return toast("まず、語り手のお話をひとつ入力してください。");
+  if (busy) return;
+  busy = true;
+  render();
+  try {
+    const out = config.aiReady
+      ? await api("card", { request: { event: r.event, task: r.task, question: r.question }, turns: r.turns })
+      : { card: localCard(r.turns) };
+    r.draft = out.card;
+    if (!out.card.title || out.card.title === "雨の日の提灯準備") r.draft.title = r.task + "の手引き";
+    r.status = "draft";
+    r.metrics.reviewStartedAt = Date.now();
+    save();
+    page = "review";
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    busy = false;
+    render();
+  }
+}
+function review() {
+  const r = current();
+  if (!r) return go("home");
+  const draft = r.status !== "confirmed",
+    c = draft ? r.draft : r.card;
+  if (!c) return go("request");
+  const unknown = FACTS.filter(([k]) => c.facts[k].status === "unknown");
+  shell(
+    `<section class="page-header"><p class="eyebrow">03　${draft ? "語り手と確認する" : "次の担い手に渡す"}</p><h1>${draft ? "この内容で、伝わりますか？" : "次の準備で、また使える。"}</h1><p>${draft ? "元のお話を確かめながら、必要なら書き直してください。" : "質問から聞き取った内容を、出どころと一緒に残しました。"}</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)} · ${esc(r.speaker)}</p><h2>${esc(c.title)}</h2>${draft ? "" : '<p class="verified">語り手と確認済み</p><br>'}<div class="facts">${FACTS.map(
+      ([k, label]) => {
+        const f = c.facts[k];
+        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}${f.sourceIds.length ? `<button class="source-btn" data-source="${k}">元のお話を確かめる ↗</button>` : ""}</section>`;
+      },
+    ).join(
+      "",
+    )}</div></article><div class="review-sidebar"><section class="side-card"><h3>${draft ? "確認して残す" : "この手引きを使う"}</h3>${draft ? `<p class="small">人名・時刻・条件を確認してください。修正した内容も、確認時の追記として残ります。</p><label class="check"><input type="checkbox" id="confirm">語り手と内容を確認しました。未確認の項目は、そのまま残します。</label><button class="primary-btn full" id="save-card">確認して残す</button>` : `<p class="small">${new Date(c.confirmedAt).toLocaleDateString("ja-JP")} に確認<br>${r.sampleData ? "架空データでの体験です。" : ""}</p><div class="settings-buttons"><button class="primary-btn" id="ask-memory">この記憶に聞く</button><button class="secondary-btn" id="print">印刷・PDFにする</button><button class="secondary-btn" id="measure">探しやすさを測る</button></div>`}</section><section class="side-card"><h3>次に聞きたいこと</h3>${unknown.length ? `<ul class="unknown-list">${unknown.map(([, l]) => `<li>${l}</li>`).join("")}</ul>` : '<p class="small">今回の6項目はお話が揃いました。実施前に変更がないか確かめましょう。</p>'}<button class="text-btn" id="resume">前回の続きから話を聞く →</button></section></div></div>`,
+  );
+  document.querySelectorAll("[data-source]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const f = c.facts[b.dataset.source];
+        modal(
+          `<h2>この内容の出どころ</h2><p>${esc(f.label)}：${esc(f.value)}</p>${f.sourceIds
+            .map((id) => {
+              const t = r.turns.find((t) => t.id === id);
+              return `<blockquote class="source-quote">${esc(t?.text || "元発言が見つかりません")}</blockquote>`;
+            })
+            .join(
+              "",
+            )}<div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`,
+        );
+      }),
+  );
+  $("#resume").onclick = beginInterview;
+  $("#save-card")?.addEventListener("click", () => {
+    if (!$("#confirm").checked) return toast("語り手と内容を確認してから、チェックを入れてください。");
+    let corrections = 0;
+    for (const [k] of FACTS) {
+      const value = $("#fact-" + k).value.trim() || "未確認";
+      if (value !== c.facts[k].value) {
+        corrections++;
+        if (value === "未確認") c.facts[k] = { ...c.facts[k], value, sourceIds: [], status: "unknown" };
+        else {
+          const t = turn("user", `確認時の追記（${c.facts[k].label}）：${value}`);
+          r.turns.push(t);
+          c.facts[k] = { ...c.facts[k], value, sourceIds: [t.id], status: "stated" };
+        }
+      }
+    }
+    r.card = reviewCard(r, { ...c, confirmed: true });
+    r.status = "confirmed";
+    r.metrics.reviewSeconds = Math.round((Date.now() - r.metrics.reviewStartedAt) / 1000);
+    r.metrics.corrections = corrections;
+    save();
+    render();
+    toast("確認した手引きを残しました。");
+  });
+  $("#ask-memory")?.addEventListener("click", () => go("knowledge"));
+  $("#print")?.addEventListener("click", () => print());
+  $("#measure")?.addEventListener("click", measurementSetup);
+}
+function knowledge() {
+  const r = current();
+  if (!r?.card) return go("home");
+  shell(
+    `<section class="page-header"><p class="eyebrow">地域の記憶と話す</p><h1>あの人の経験に、いつでも聞ける。</h1><p>${esc(r.speaker)}が確認したお話から答えます。本人の代わりに判断することはできません。</p></section><section class="knowledge paper-card"><div id="memory-log"><p class="source-quote">${esc(r.task)}について、知りたいことはありますか？</p></div><form id="memory-form" class="composer"><label class="sr-only" for="memory-question">記憶に聞きたいこと</label><textarea id="memory-question" required placeholder="雨の日はどこで準備するの？"></textarea><button class="round primary" aria-label="記憶に質問する">${icon("send")}</button></form><button class="text-btn" id="back-card">確認済みの手引きを見る →</button></section>`,
+  );
+  $("#back-card").onclick = () => go("review");
+  $("#memory-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const q = $("#memory-question").value.trim();
+    if (!q) return;
+    const button = $("#memory-form button");
+    button.disabled = true;
+    try {
+      const result = config.aiReady
+        ? await api("answer", { question: q, card: r.card })
+        : { keys: answerKeys(q, r.card) };
+      const keys = result.keys || [];
+      const log = $("#memory-log");
+      log.innerHTML += `<p class="memory-q">${esc(q)}</p>${keys.length ? keys.map((k) => `<section class="memory-a"><p class="fact-label">${esc(r.card.facts[k].label)}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p><blockquote class="small">${r.card.facts[k].sourceIds.map((id) => esc(r.turns.find((t) => t.id === id)?.text || "")).join("<br>")}</blockquote></section>`).join("") : `<p class="source-quote">そのことは、まだ記録されていません。次の聞き取りで確認しましょう。</p><button class="secondary-btn" id="queue-question">この質問を次の聞き取りへ</button>`}`;
+      $("#memory-question").value = "";
+      $("#queue-question")?.addEventListener("click", () => {
+        r.pendingQuestions ||= [];
+        r.pendingQuestions.push(q);
+        save();
+        toast("次の聞き取りで、この質問から始めます。");
+        $("#queue-question").disabled = true;
+      });
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+function dictate(target) {
+  const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Speech) return toast("このブラウザでは音声入力を利用できません。文字で入力できます。");
+  const r = new Speech();
+  r.lang = "ja-JP";
+  r.interimResults = false;
+  r.onresult = (e) => {
+    target.value += (target.value ? "\n" : "") + e.results[0][0].transcript;
+    target.focus();
+  };
+  r.onerror = () => toast("音声を取得できませんでした。マイクの許可を確認してください。");
+  r.start();
+  toast("お話しください。音声認識はブラウザの機能を利用します。");
+}
+async function startLive() {
+  try {
+    const { startConversation } = await import("./live.js");
+    const r = current();
+    $("#live").disabled = true;
+    await startConversation({
+      getToken: () => api("live-token", {}),
+      request: r,
+      onTurn: (role, text) => {
+        r.turns.push(turn(role, text));
+        save();
+        const p = document.createElement("div");
+        p.className = "msg " + role;
+        p.innerHTML = `<p class="who">${role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(text)}</p>`;
+        $(".chat-log")?.append(p);
+        if ($(".chat-log")) $(".chat-log").scrollTop = $(".chat-log").scrollHeight;
+      },
+      onStatus: (text, stop) => {
+        const n = $("#live-status");
+        if (!n) return;
+        n.className = "live-indicator";
+        n.textContent = text;
+        if (stop) {
+          const b = document.createElement("button");
+          b.className = "secondary-btn";
+          b.textContent = "会話を終了";
+          b.onclick = stop;
+          n.append(b);
+        }
+      },
+      onEnd: () => render(),
+    });
+  } catch (e) {
+    toast(e.message);
+    render();
+  }
+}
+const regionInfo = {
+  tohoku: {
+    name: "東北の里山",
+    query: "東北地方",
+    hint: "山あいの暮らしや、受け継がれる祭りに触れたい方へ。",
+    position: "日本の北東部",
+    topic: "祭りや雪国の暮らし",
+  },
+  kansai: {
+    name: "関西の町並み",
+    query: "関西地方",
+    hint: "町の商い、人の集まる場所の記憶を知りたい方へ。",
+    position: "本州の中西部",
+    topic: "商店街や町の行事",
+  },
+  setouchi: {
+    name: "瀬戸内の海辺",
+    query: "瀬戸内海",
+    hint: "海のそばの日常や、島の暮らしに関心がある方へ。",
+    position: "本州・四国・九州に囲まれた海域",
+    topic: "海辺の日常や島の記憶",
+  },
+};
+function regions(filter = "all") {
+  shell(
+    `<section class="page-header"><p class="eyebrow">旅の案内役</p><h1>どんな町に、出会いたいですか。</h1><p>まずは大まかな地域から。風景と位置を見て、気になる話を探しましょう。</p></section><div class="region-content"><form id="region-form" class="region-search"><label for="region-select">まず、気になるのは</label><select class="field" id="region-select"><option value="all">まだ決まっていない</option><option value="tohoku" ${filter === "tohoku" ? "selected" : ""}>里山・祭りのある暮らし</option><option value="kansai" ${filter === "kansai" ? "selected" : ""}>町並み・商いの記憶</option><option value="setouchi" ${filter === "setouchi" ? "selected" : ""}>海辺・島の日常</option></select><button class="primary-btn">合いそうな地域を見る</button></form><p class="small region-note">地域を絞る流れのデモです。取材済みの語り部はまだ登録されていません。</p><div class="region-grid">${Object.entries(
+      regionInfo,
+    )
+      .filter(([k]) => filter === "all" || filter === k)
+      .map(
+        ([k, r]) =>
+          `<article class="region-card"><div class="region-photo ${k}">${`<img src="images/${k === "tohoku" ? "satoyama" : k}.png" alt="${r.name}の風景イメージ">`}<span>風景イメージ・AI生成</span></div><div class="region-body"><p class="meta">${r.position}</p><h2>${r.name}</h2><p>${r.hint}</p><div class="region-links"><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.query)}" target="_blank" rel="noopener">地図で位置を見る ↗</a><button class="secondary-btn" data-region="${k}">この地域の話を探す</button></div></div></article>`,
+      )
+      .join(
+        "",
+      )}</div><p class="small region-note">写真は実在の特定の町・語り手を紹介するものではありません。地域の情報は取材・確認後に追加します。</p></div>`,
+  );
+  $("#region-form").onsubmit = (e) => {
+    e.preventDefault();
+    regions($("#region-select").value);
+  };
+  document.querySelectorAll("[data-region]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const r = regionInfo[b.dataset.region];
+        modal(
+          `<h2>${r.name}で、聞いてみたいこと</h2><p>現在、この地域の取材済みのお話はありません。${r.topic}について、知りたいことを残せます。</p><label for="regional-question">聞きたいこと</label><textarea class="field" id="regional-question" placeholder="この土地の祭りは、どうやって準備するの？"></textarea><div class="dialog-actions"><button class="secondary-btn" data-close>戻る</button><button class="primary-btn" id="regional-save">質問を残す</button></div>`,
+          () => {
+            $("#regional-save").onclick = () => {
+              const req = create($("#regional-question").value, false, r.name, "地域の暮らし");
+              if (req) {
+                $("#dialog").close();
+                go("request");
+              }
+            };
+          },
+        );
+      }),
+  );
+}
+function settings() {
+  modal(
+    `<h2>会話と保存の設定</h2><p>${config.aiReady ? "Google AIの接続設定があります。利用時の通信で接続を確認します。" : "Google AIは未接続です。体験モードでは、この端末で流れを試せます。"}<br>保存：${esc(saveMessage)}</p>${config.requiresCode ? '<label>チームのデモアクセスコード<input class="field" type="password" id="access" autocomplete="off"></label><button class="secondary-btn" id="set-access">接続する</button>' : ""}<details class="settings-group"><summary>検証と記録</summary><div class="settings-buttons"><button class="secondary-btn" id="metrics">測定結果を見る</button><button class="secondary-btn" id="export-json">記録を保存</button><button class="secondary-btn" id="export-csv">測定CSVを保存</button></div><p>測定は実際に操作した結果だけ記録します。架空データ・チーム内テストも区別します。</p></details><div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`,
+    () => {
+      $("#metrics").onclick = () => {
+        $("#dialog").close();
+        go("metrics");
+      };
+      $("#export-json").onclick = () =>
+        download("ツギテ_記録.json", JSON.stringify(state, null, 2), "application/json");
+      $("#export-csv").onclick = exportCSV;
+      $("#set-access")?.addEventListener("click", async () => {
+        code = $("#access").value;
+        sessionStorage.setItem("tsugite-access", code);
+        try {
+          await api("workspace/" + wid);
+          save();
+          toast("接続を確認しました。");
+        } catch (e) {
+          toast(e.message);
+        }
+      });
+    },
+  );
+}
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function exportCSV() {
+  const cols = [
+    "id",
+    "participant",
+    "role",
+    "condition",
+    "seconds",
+    "score",
+    "criticalErrors",
+    "reviewed",
+    "sampleData",
+  ];
+  const rows = state.measurements.map((m) =>
+    cols.map((k) => '"' + String(m[k] ?? "").replaceAll('"', '""') + '"').join(","),
+  );
+  download("ツギテ_測定.csv", "\uFEFF" + cols.join(",") + "\n" + rows.join("\n"), "text/csv;charset=utf-8");
+}
+function measurementSetup() {
+  const r = current();
+  if (!r?.card) return toast("先に手引きを確認してください。");
+  modal(
+    `<h2>探しやすさを測る</h2><p>4つの質問に答える時間と正答数を測ります。比較は別の協力者、または出題順を変えて行ってください。同じ内容の2回目は記憶の影響を受けます。</p><label>参加者の記号<input class="field" id="participant" placeholder="P01（実名は不要）"></label><label>協力者の区分<select class="field" id="participant-role"><option value="team">チーム内テスト</option><option value="stakeholder">実際の行事の担い手</option></select></label><label>見るもの<select class="field" id="condition"><option value="transcript">聞き取りの全文</option><option value="card">確認済みの手引き</option></select></label><div class="dialog-actions"><button class="secondary-btn" data-close>戻る</button><button class="primary-btn" id="start-test">計測を始める</button></div>`,
+    () => {
+      $("#start-test").onclick = () => {
+        if (!$("#participant").value.trim()) return toast("参加者の記号を入力してください。");
+        test = {
+          id: crypto.randomUUID(),
+          requestId: r.id,
+          participant: $("#participant").value.trim(),
+          role: $("#participant-role").value,
+          condition: $("#condition").value,
+          startedAt: Date.now(),
+          sampleData: r.sampleData,
+        };
+        $("#dialog").close();
+        go("test");
+      };
+    },
+  );
+}
+function testPage() {
+  const r = current();
+  shell(
+    `<section class="page-header"><p class="eyebrow">実測テスト</p><h1>資料を見て、4つの質問に答えてください。</h1><p>分からない場合は「未確認」で構いません。回答を提出するまでの時間を測ります。</p></section><div class="test-layout"><section class="paper-card test-source"><h2>${test.condition === "card" ? "確認済みの手引き" : "聞き取りの全文"}</h2>${test.condition === "card" ? FACTS.map(([k, l]) => `<div class="fact"><p class="fact-label">${l}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p></div>`).join("") : r.turns.map((t) => `<p class="small">${t.role === "user" ? esc(r.speaker) : "聞き役"}</p><p class="source-quote">${esc(t.text)}</p>`).join("")}</section><form class="paper-card" id="answers">${[
+      ["when", "何時に集まりますか？"],
+      ["where", "雨の日は、どこで準備しますか？"],
+      ["why", "その場所で準備するのはなぜですか？"],
+      ["contact", "外につるすか迷ったら、誰に確認しますか？"],
+    ]
+      .map(
+        ([k, l]) =>
+          `<div class="test-question"><label for="answer-${k}">${l}</label><textarea class="field" id="answer-${k}" required></textarea></div>`,
+      )
+      .join("")}<button class="primary-btn full">回答を提出して計測を止める</button></form></div>`,
+  );
+  $("#answers").onsubmit = (e) => {
+    e.preventDefault();
+    const answers = Object.fromEntries(
+      ["when", "where", "why", "contact"].map((k) => [k, $("#answer-" + k).value]),
+    );
+    const m = {
+      ...test,
+      seconds: Math.round((Date.now() - test.startedAt) / 1000),
+      answers: assessAnswers(r.card, answers),
+      reviewed: false,
+      createdAt: new Date().toISOString(),
+    };
+    state.measurements.push(m);
+    save();
+    test = null;
+    go("metrics");
+    score(m);
+  };
+}
+function score(m) {
+  modal(
+    `<h2>回答を人が確認する</h2><p>元の手引きと照らして採点します。未確認を断定した場合も、誤りとして扱ってください。</p>${m.answers.map((a, i) => `<label>${esc(a.label)}</label><p>期待する内容：${esc(a.expected)}<br>回答：${esc(a.answer)}</p><select class="field" id="score-${i}"><option value="">採点してください</option><option value="1">正しい</option><option value="0">誤り・不足</option></select>`).join("")}<label>安全や当日の実施に影響する誤りの数<input class="field" id="critical" type="number" min="0" max="4" value="0"></label><div class="dialog-actions"><button class="secondary-btn" data-close>後で採点</button><button class="primary-btn" id="score-save">採点を保存</button></div>`,
+    () => {
+      $("#score-save").onclick = () => {
+        const scores = m.answers.map((_, i) => $("#score-" + i).value);
+        if (scores.some((x) => x === "")) return toast("4問とも採点してください。");
+        m.score = scores.reduce((n, x) => n + Number(x), 0);
+        m.criticalErrors = Number($("#critical").value);
+        m.reviewed = true;
+        save();
+        $("#dialog").close();
+        render();
+      };
+    },
+  );
+}
+function median(values) {
+  if (!values.length) return "—";
+  const v = values.toSorted((a, b) => a - b),
+    n = v.length;
+  return Math.round(n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2) + "秒";
+}
+function metrics() {
+  const m = state.measurements,
+    confirmed = state.requests.filter((r) => r.status === "confirmed");
+  shell(
+    `<section class="page-header"><p class="eyebrow">実際に測った記録</p><h1>次の担い手が、使えるか。</h1><p>数値が空欄なのは、まだ測っていないためです。チーム内テストと当事者テストは分けて判断します。</p></section><section class="metrics"><div class="metric-row"><article class="metric-tile"><span>全文から探す時間・中央値</span><strong>${median(m.filter((x) => x.condition === "transcript").map((x) => x.seconds))}</strong><span>${m.filter((x) => x.condition === "transcript").length}件</span></article><article class="metric-tile"><span>手引きから探す時間・中央値</span><strong>${median(m.filter((x) => x.condition === "card").map((x) => x.seconds))}</strong><span>${m.filter((x) => x.condition === "card").length}件</span></article><article class="metric-tile"><span>語り手の確認時間・中央値</span><strong>${median(confirmed.map((r) => r.metrics.reviewSeconds))}</strong><span>${confirmed.length}件・修正合計${confirmed.reduce((n, r) => n + (r.metrics.corrections || 0), 0)}項目</span></article></div><div class="metric-controls"><button class="secondary-btn" id="new-test">この手引きで計測する</button><button class="text-btn" id="csv">測定CSVを保存 ↗</button></div><div class="table-wrap"><table><thead><tr><th>参加者</th><th>区分</th><th>資料</th><th>時間</th><th>正答</th><th>影響する誤り</th><th>内容</th><th>採点</th></tr></thead><tbody>${m.map((x) => `<tr><td>${esc(x.participant)}</td><td>${x.role === "team" ? "チーム内" : "当事者"}</td><td>${x.condition === "card" ? "手引き" : "全文"}</td><td>${x.seconds}秒</td><td>${x.reviewed ? x.score + "/4" : "未採点"}</td><td>${x.reviewed ? x.criticalErrors : "—"}</td><td>${x.sampleData ? "架空データ" : "入力データ"}</td><td><button class="text-btn" data-score="${x.id}">確認する</button></td></tr>`).join("") || '<tr><td colspan="8" class="empty">測定結果はまだありません。</td></tr>'}</tbody></table></div></section>`,
+  );
+  $("#new-test").onclick = measurementSetup;
+  $("#csv").onclick = exportCSV;
+  document
+    .querySelectorAll("[data-score]")
+    .forEach((b) => (b.onclick = () => score(m.find((x) => x.id === b.dataset.score))));
+}
+render();
+(async () => {
+  try {
+    config = await api("config");
+    if (config.storage !== "browser" && (!config.requiresCode || code)) {
+      const saved = await api("workspace/" + wid);
+      if (saved.data && state.requests.length === 0) {
+        state = saved.data;
+        active = state.requests[0]?.id;
+        localStorage.setItem(key, JSON.stringify(state));
+      }
+    }
+    saveMessage =
+      config.storage === "firestore"
+        ? "Firestoreと端末に保存"
+        : config.storage === "browser"
+          ? "この端末のブラウザに保存"
+          : "この端末とサーバーに保存";
+    render();
+  } catch {
+    if (config.storage === "browser") {
+      saveMessage = "この端末のブラウザに保存";
+      render();
+    } else toast("サーバー保存は未接続です。設定を確認してください。");
+  }
+})();
