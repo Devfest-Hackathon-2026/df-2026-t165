@@ -3636,3 +3636,14 @@ h3,
   text-align: center;
   font-size: 14px;
 }
+/* 「この町の記録を残す」も「地図で見る」と同じ透過の枠線ボタンに（帯の中で目立ちすぎないように） */
+.band-btn.is-hinoki {
+  background: transparent;
+  border-color: #6d86b8;
+  color: #fff;
+  font-weight: 400;
+}
+.band-btn.is-hinoki:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #fff;
+}
