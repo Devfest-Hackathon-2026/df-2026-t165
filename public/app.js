@@ -156,6 +156,7 @@ const hearingSteps = [
   {
     key: "env",
     multi: false,
+    placeholder: "例：駅まで歩ける静かな住宅地、雪の少ないところ",
     q: "どんな場所で暮らしたいですか？",
     options: [
       ["sea", "海や川の近く"],
@@ -167,6 +168,7 @@ const hearingSteps = [
   {
     key: "values",
     multi: true,
+    placeholder: "例：古い町並みを残す活動に関わりたい",
     q: "暮らしの中で、大事にしたいことは？",
     hint: "いくつ選んでも大丈夫です。",
     options: [
@@ -180,6 +182,7 @@ const hearingSteps = [
   {
     key: "area",
     multi: false,
+    placeholder: "例：北陸、実家のある県の近く",
     q: "考えている方面はありますか？",
     options: [
       ["tohoku", "東北"],
@@ -224,7 +227,14 @@ function finishIntake() {
     const first = t ? (t[0] === "names" ? `「${a.place}」` : a.place) + t[2] : a.topic && a.topic !== "none" ? a.topic : "";
     return openPlace(a.place, first);
   }
-  hearing = { env: a.env || "", values: a.values || [], area: a.area || "", note: a.note || "" };
+  const texts = intake.history.filter((x) => x.text).map((x) => x.text);
+  hearing = {
+    env: a.env || "",
+    values: a.values || [],
+    area: a.area || "",
+    note: [...texts, a.note].filter(Boolean).join("\n"),
+    texts,
+  };
   const box = $(".intake-current");
   if (box) box.innerHTML = '<p class="searching" role="status">お答えに合う地域を探しています</p>';
   setTimeout(() => go("regions"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 900);
@@ -292,8 +302,8 @@ function questionFor(step) {
       q: s.q,
       hint: s.hint,
       body: s.multi
-        ? `<form id="multi-form"><div class="choices chips-wrap">${s.options.map(([v, l], i) => `<label class="chip" style="--i:${i}"><input type="checkbox" value="${v}" data-l="${l}"><span>${l}</span></label>`).join("")}</div><div class="intake-next" style="--i:${s.options.length}"><button class="primary-btn">次へ</button><button type="button" class="text-btn" id="skip">とくにない</button></div></form>`
-        : `<div class="choices chips-wrap">${s.options.map(([v, l], i) => `<button class="chip-btn" style="--i:${i}" data-v="${v}" data-l="${l}">${l}</button>`).join("")}</div>`,
+        ? `<form id="multi-form"><div class="choices chips-wrap">${s.options.map(([v, l], i) => `<label class="chip" style="--i:${i}"><input type="checkbox" value="${v}" data-l="${l}"><span>${l}</span></label>`).join("")}</div><label class="label own-words" for="free" style="--i:${s.options.length}">自分の言葉でも書けます</label><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}" style="--i:${s.options.length}"><div class="intake-next" style="--i:${s.options.length + 1}"><button class="primary-btn">次へ</button><button type="button" class="text-btn" id="skip">とくにない</button></div></form>`
+        : `<div class="choices chips-wrap">${s.options.map(([v, l], i) => `<button class="chip-btn" style="--i:${i}" data-v="${v}" data-l="${l}">${l}</button>`).join("")}</div><label class="label own-words" for="free" style="--i:${s.options.length}">選択肢にないときは、自分の言葉で</label><form class="free" id="free-form" style="--i:${s.options.length}"><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}"><button class="secondary-btn">次へ</button></form>`,
     };
   return {
     q: "ほかに、気になることはありますか？",
@@ -349,8 +359,8 @@ function welcome() {
     `<section class="intake ${first ? "is-entering" : ""}">${intake.history.length ? `<ol class="intake-past">${past}</ol>` : `<p class="intake-hello">町の昔を、そこで暮らした人に聞く。</p>`}<div class="intake-current"><h1 class="intake-q" aria-live="polite"><span class="sr-only">${esc(q)}</span><span class="typed" aria-hidden="true" data-text="${esc(q)}">${first ? "" : esc(q)}</span></h1>${hint ? `<p class="intake-hint">${esc(hint)}</p>` : ""}<div class="intake-body">${body}</div>${intake.history.length ? '<div class="intake-back"><button class="text-btn" id="back">ひとつ前に戻る</button><button class="text-btn" id="restart">ホームに戻る</button></div>' : ""}</div></section>`,
   );
   const qText = q;
-  const commit = (key, value, label) => {
-    intake.history.push({ key, value, label, q: qText });
+  const commit = (key, value, label, text = "") => {
+    intake.history.push({ key, value, label, q: qText, text });
     if (intakeStep() === "done") finishIntake();
     else render();
   };
@@ -374,18 +384,21 @@ function welcome() {
     ($("#free-form").onsubmit = (e) => {
       e.preventDefault();
       const v = $("#free").value.trim();
-      if (cur !== "note" && !v) return toast("入力するか、下の選択肢から選んでください。");
+      if (cur !== "note" && !v) return toast("入力するか、選択肢から選んでください。");
+      if (hearingSteps.some((x) => x.key === cur)) return commit(cur, "", v, v);
       commit(cur, v, v || "とくになし");
     });
   $("#multi-form") &&
     ($("#multi-form").onsubmit = (e) => {
       e.preventDefault();
-      const picked = [...document.querySelectorAll("#multi-form input:checked")];
-      if (!picked.length) return toast("ひとつ以上選ぶか、「とくにない」を押してください。");
+      const picked = [...document.querySelectorAll("#multi-form input:checked")],
+        text = $("#free").value.trim();
+      if (!picked.length && !text) return toast("ひとつ以上選ぶか、自分の言葉で書いてください。");
       commit(
         cur,
         picked.map((x) => x.value),
-        picked.map((x) => x.dataset.l).join("、"),
+        [...picked.map((x) => x.dataset.l), text].filter(Boolean).join("、"),
+        text,
       );
     });
   $("#skip") && ($("#skip").onclick = () => commit(cur, [], "とくにない"));
@@ -1163,9 +1176,10 @@ function regions() {
       answerLabel("env", hearing.env),
       ...hearing.values.map((v) => answerLabel("values", v)),
       hearing.area ? answerLabel("area", hearing.area) : "",
+      ...(hearing.texts || []),
     ].filter(Boolean);
   shell(
-    `<section class="hero hero-small"><h1>合いそうな地域の候補</h1><p class="lead">${answered.length ? `「${answered.map(esc).join("」「")}」をもとに選びました。` : "お答えをもとに選びました。"}${fits.length ? "" : "ぴったり合う候補がなかったため、登録済みの地域をすべて表示しています。"}</p><button class="text-btn" data-page="welcome" id="redo">答えを変える</button></section>${hearing.area === "other" ? '<p class="notice">「そのほか」の方面は、まだ地域の記録がありません。取材が進んだら候補に加わります。</p>' : ""}<div class="region-grid">${shown
+    `<section class="hero hero-small"><h1>合いそうな地域の候補</h1><p class="lead">${answered.length ? `「${answered.map(esc).join("」「")}」をもとに選びました。` : "お答えをもとに選びました。"}${fits.length ? "" : "ぴったり合う候補がなかったため、登録済みの地域をすべて表示しています。"}</p><button class="text-btn" data-page="welcome" id="redo">答えを変える</button></section><form class="refine" id="refine-form"><label class="label" for="refine">条件を書き足して、探し直す</label><div class="free"><input class="field" id="refine" autocomplete="off" maxlength="300" placeholder="例：港町で、漁の祭りが残っているところ" required><button class="secondary-btn">探し直す</button></div></form>${hearing.area === "other" ? '<p class="notice">「そのほか」の方面は、まだ地域の記録がありません。取材が進んだら候補に加わります。</p>' : ""}<div class="region-grid">${shown
       .map(
         ({ k, r, reasons }) =>
           `<article class="region-card"><figure class="region-photo"><img src="images/${r.image}.jpg" alt="${r.name}の風景イメージ" loading="lazy" width="640" height="427"><figcaption>AIで作った風景イメージ</figcaption></figure><div class="region-body"><p class="meta">${r.position}</p><h2>${r.name}</h2><p>${r.hint}</p>${reasons.length ? `<p class="reasons"><span>合う点</span>${reasons.map((x) => `<em>${esc(x)}</em>`).join("")}</p>` : ""}<div class="region-links"><button class="primary-btn" data-region="${k}">この地域の話を見る</button><a class="text-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.query)}" target="_blank" rel="noopener">地図で見る</a></div></div></article>`,
@@ -1175,6 +1189,15 @@ function regions() {
       )}</div><p class="small region-note">候補は体験用の簡単な振り分けです。写真は実在の特定の町や語り手を紹介するものではありません。</p>`,
   );
   $("#redo").onclick = () => go("welcome");
+  $("#refine-form").onsubmit = (e) => {
+    e.preventDefault();
+    const v = $("#refine").value.trim();
+    if (!v) return;
+    hearing.texts = [...(hearing.texts || []), v];
+    hearing.note = [hearing.note, v].filter(Boolean).join("\n");
+    regions();
+    toast("書き足した条件で、候補を探し直しました。");
+  };
   document.querySelectorAll("[data-region]").forEach(
     (b) => (b.onclick = () => openPlace(regionInfo[b.dataset.region].name)),
   );

@@ -2039,3 +2039,16 @@ dialog label {
     font-size: 12px;
   }
 }
+.own-words {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+#multi-form {
+  display: grid;
+  gap: 10px;
+}
+.refine {
+  max-width: 640px;
+  margin: 0 0 28px;
+}
