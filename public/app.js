@@ -9,6 +9,8 @@ import {
   answerKeys,
 } from "./domain.js";
 import { townData } from "./town-data.js";
+import { tileArt } from "./tile-art.js";
+import { mountMapPicker, candidateKey } from "./japan-map.js";
 import { putFile, deleteFile, fileUrl, kindOf, MAX_BYTES, ACCEPT } from "./material-store.js";
 const $ = (s) => document.querySelector(s),
   esc = (v) =>
@@ -270,6 +272,10 @@ function startRecording(place, how = "talk") {
   save();
   beginInterview();
 }
+// Spotifyの初期設定のような、画像つきの大きなタイル。multi のときは押すたびに選択が切り替わる
+const tileCheck = `<span class="tile-check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>`;
+const tiles = (options, multi = false) =>
+  `<div class="tiles">${options.map(([v, l], i) => `<button type="button" class="tile" style="--i:${i}" ${multi ? `data-t="${v}" aria-pressed="false"` : `data-v="${v}"`} data-l="${l}"><span class="tile-art">${tileArt(v)}</span><span class="tile-label">${l}</span>${tileCheck}</button>`).join("")}</div>`;
 function questionFor(step) {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (step === "purpose") return { q: "こんにちは。今日は、どちらをしますか？", body: choiceList(purposes) };
@@ -285,7 +291,7 @@ function questionFor(step) {
     return {
       q: a.purpose === "record" ? "どの町のお話を残しますか？" : "どの町のことを知りたいですか？",
       hint: "市町村名でも、地区や通りの名前でも大丈夫です。",
-      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button>${a.purpose === "view" ? '<button class="choice-sm" data-switch="unknown">町の名前が決まっていない</button>' : ""}</div>`,
+      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button><button type="button" class="choice-sm" id="open-map">地図から選ぶ</button>${a.purpose === "view" ? '<button class="choice-sm" data-switch="unknown">町の名前が決まっていない</button>' : ""}</div><div id="place-map" class="map-slot" hidden></div>`,
     };
   if (step === "how")
     return {
@@ -300,16 +306,18 @@ function questionFor(step) {
     return {
       q: `${a.place}の、どんなことを知りたいですか？`,
       hint: "選んだことから、AIがまず資料と地域の人の語りをもとに答えます。",
-      body: `${choiceList(topics, "grid-2")}<form class="free" id="free-form" style="--i:4"><label class="sr-only" for="free">知りたいことを書く</label><input class="field" id="free" autocomplete="off" maxlength="1000" placeholder="自分の言葉で書く（例：駅前の商店街はいつできたの？）" required><button class="secondary-btn">次へ</button></form><div class="choices compact" style="--i:5"><button class="choice-sm" data-v="none" data-l="とくに決めていない">とくに決めていない</button></div>`,
+      body: `${tiles(topics)}<form class="free" id="free-form" style="--i:4"><label class="sr-only" for="free">知りたいことを書く</label><input class="field" id="free" autocomplete="off" maxlength="1000" placeholder="自分の言葉で書く（例：駅前の商店街はいつできたの？）" required><button class="secondary-btn">次へ</button></form><div class="choices compact" style="--i:5"><button class="choice-sm" data-v="none" data-l="とくに決めていない">とくに決めていない</button></div>`,
     };
   const s = hearingSteps.find((x) => x.key === step);
   if (s)
     return {
       q: s.q,
       hint: s.hint,
-      body: s.multi
-        ? `<form id="multi-form"><div class="choices chips-wrap">${s.options.map(([v, l], i) => `<label class="chip" style="--i:${i}"><input type="checkbox" value="${v}" data-l="${l}"><span>${l}</span></label>`).join("")}</div><label class="label own-words" for="free" style="--i:${s.options.length}">自分の言葉でも書けます</label><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}" style="--i:${s.options.length}"><div class="intake-next" style="--i:${s.options.length + 1}"><button class="primary-btn">次へ</button><button type="button" class="text-btn" id="skip">とくにない</button></div></form>`
-        : `<div class="choices chips-wrap">${s.options.map(([v, l], i) => `<button class="chip-btn" style="--i:${i}" data-v="${v}" data-l="${l}">${l}</button>`).join("")}</div><label class="label own-words" for="free" style="--i:${s.options.length}">選択肢にないときは、自分の言葉で</label><form class="free" id="free-form" style="--i:${s.options.length}"><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}"><button class="secondary-btn">次へ</button></form>`,
+      body: s.key === "area"
+        ? `<div id="area-map" class="map-slot"></div><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="any" data-l="こだわらない">方面にはこだわらない</button></div><label class="label own-words" for="free" style="--i:2">地図にないときは、自分の言葉で</label><form class="free" id="free-form" style="--i:2"><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}"><button class="secondary-btn">次へ</button></form>`
+        : s.multi
+        ? `<form id="multi-form">${tiles(s.options, true)}<label class="label own-words" for="free" style="--i:${s.options.length}">自分の言葉でも書けます</label><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}" style="--i:${s.options.length}"><div class="intake-next" style="--i:${s.options.length + 1}"><button class="primary-btn">次へ</button><button type="button" class="text-btn" id="skip">とくにない</button></div></form>`
+        : `${tiles(s.options)}<label class="label own-words" for="free" style="--i:${s.options.length}">選択肢にないときは、自分の言葉で</label><form class="free" id="free-form" style="--i:${s.options.length}"><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}"><button class="secondary-btn">次へ</button></form>`,
     };
   return {
     q: "ほかに、気になることはありますか？",
@@ -373,7 +381,7 @@ function welcome() {
     { q, hint, body } = questionFor(cur),
     stepId = cur + intake.history.length,
     first = !intake.typed.has(stepId);
-  const keyLabel = { purpose: "目的", knows: "町", place: "町", topic: "知りたいこと", how: "残し方", env: "場所", values: "大事なこと", area: "方面", note: "ほか" };
+  const keyLabel = { purpose: "目的", knows: "町名", place: "町", topic: "知りたいこと", how: "残し方", env: "場所", values: "大事なこと", area: "方面", note: "ほか" };
   const past = intake.history
     .map((x) => `<li><span>${keyLabel[x.key] || ""}</span><b>${esc(x.label)}</b></li>`)
     .join("");
@@ -382,7 +390,7 @@ function welcome() {
     nowAt = Math.min(intake.history.length + 1, total),
     progress = `<div class="progress" role="img" aria-label="${total}問中${nowAt}問目">${Array.from({ length: total }, (_, i) => `<span class="${i < nowAt - 1 ? "done" : i === nowAt - 1 ? "now" : ""}"></span>`).join("")}<small>${nowAt} / ${total}</small></div>`;
   shell(
-    `<section class="intake ${first ? "is-entering" : ""}"><div class="intake-top">${progress}<ul class="past-chips">${past}</ul></div><div class="intake-current"><h1 class="intake-q" aria-live="polite"><span class="sr-only">${esc(q)}</span><span class="typed" aria-hidden="true" data-text="${esc(q)}">${first ? "" : esc(q)}</span></h1>${hint ? `<p class="intake-hint">${esc(hint)}</p>` : ""}<div class="intake-body">${body}</div>${intake.history.length ? '<div class="intake-back"><button class="text-btn" id="back">ひとつ前に戻る</button><button class="text-btn" id="restart">ホームに戻る</button></div>' : ""}</div></section>`,
+    `<section class="intake ${first ? "is-entering" : ""}"><div class="intake-top">${progress}<ul class="past-chips">${past}</ul></div><div class="intake-current"><h1 class="intake-q" aria-live="polite"><span class="sr-only">${esc(q)}</span><span class="typed" aria-hidden="true" data-text="${esc(q)}">${first ? "" : esc(q)}</span></h1>${hint ? `<p class="intake-hint">${esc(hint)}</p>` : ""}<div class="intake-body">${body}</div>${intake.history.length ? '<div class="intake-back"><button class="back-btn" id="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>ひとつ前に戻る</button><button class="back-btn" id="restart"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></svg>ホームに戻る</button></div>' : ""}</div></section>`,
   );
   const qText = q;
   const commit = (key, value, label, text = "") => {
@@ -417,7 +425,7 @@ function welcome() {
   $("#multi-form") &&
     ($("#multi-form").onsubmit = (e) => {
       e.preventDefault();
-      const picked = [...document.querySelectorAll("#multi-form input:checked")],
+      const picked = [...document.querySelectorAll('#multi-form .tile[aria-pressed="true"]')].map((t) => ({ value: t.dataset.t, dataset: t.dataset })),
         text = $("#free").value.trim();
       if (!picked.length && !text) return toast("ひとつ以上選ぶか、自分の言葉で書いてください。");
       commit(
@@ -428,6 +436,32 @@ function welcome() {
       );
     });
   $("#skip") && ($("#skip").onclick = () => commit(cur, [], "とくにない"));
+  document.querySelectorAll(".tile[data-t]").forEach(
+    (t) => (t.onclick = () => t.setAttribute("aria-pressed", String(t.getAttribute("aria-pressed") !== "true"))),
+  );
+  if ($("#area-map"))
+    mountMapPicker($("#area-map"), {
+      confirmLabel: "この地域で候補を探す",
+      onPick: ({ region, pref }) => commit("area", candidateKey(region, pref), pref ? `${region.name}・${pref}` : region.name, pref || region.name),
+    });
+  if ($("#open-map"))
+    $("#open-map").onclick = () => {
+      const slot = $("#place-map");
+      slot.hidden = !slot.hidden;
+      if (!slot.hidden && !slot.dataset.ready) {
+        slot.dataset.ready = "1";
+        mountMapPicker(slot, {
+          confirmLabel: "この地域で入力する",
+          onPick: ({ region, pref }) => {
+            const f = $("#free");
+            f.value = (pref || region.name) + " ";
+            f.focus();
+            f.setSelectionRange(f.value.length, f.value.length);
+            toast(`「${pref || region.name}」を入れました。続けて市町村や地区の名前を入力してください。`);
+          },
+        });
+      }
+    };
   $("#back") &&
     ($("#back").onclick = () => {
       intake.history.pop();
@@ -444,23 +478,15 @@ function typeQuestion(animate, stepId) {
   const el = $(".typed"),
     sec = $(".intake");
   if (!el || !sec) return;
-  const text = el.dataset.text,
-    reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.textContent = el.dataset.text;
   const done = () => {
-    el.textContent = text;
     sec.classList.add("is-ready");
     intake.typed.add(stepId);
     sec.querySelector("#free")?.focus({ preventScroll: true });
   };
-  if (!animate || reduced) return done();
-  let i = 0;
-  const tick = () => {
-    if (!el.isConnected) return;
-    el.textContent = text.slice(0, ++i);
-    if (i < text.length) setTimeout(tick, 45);
-    else setTimeout(done, 180);
-  };
-  setTimeout(tick, intake.history.length ? 150 : 600);
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) return done();
+  // 見出しは一括でフェードイン → 選択肢が順に現れる
+  requestAnimationFrame(() => setTimeout(done, intake.history.length ? 60 : 350));
 }
 function openPlace(name, question = "") {
   placeName = name.slice(0, 80);
@@ -520,6 +546,51 @@ async function openMaterial(id) {
   if (!url) return toast("この資料のファイルは、この端末に保存されていません。");
   window.open(url, "_blank", "noopener");
 }
+// カメラで撮る。スマホはOSのカメラ（capture入力）、パソコンはブラウザ内で撮影する。撮った写真は通常の登録と同じ流れに入る
+function openCamera() {
+  const coarse = matchMedia("(pointer: coarse)").matches;
+  if (coarse || !navigator.mediaDevices?.getUserMedia) return $("#camera-input").click();
+  let stream = null;
+  const stop = () => stream?.getTracks().forEach((t) => t.stop());
+  modal(
+    `<h2>カメラで撮る</h2><p class="small">写したいものを枠に入れて「撮影する」を押してください。映像は保存されず、撮った1枚だけが資料になります。</p><div class="camera-box"><video id="cam" autoplay playsinline muted></video><p class="camera-msg" id="cam-msg" role="status">カメラを起動しています…</p></div><div class="dialog-actions"><button class="secondary-btn" id="cam-cancel">やめる</button><button class="primary-btn" id="cam-shot" disabled>撮影する</button></div>`,
+    (d) => {
+      const video = d.querySelector("#cam");
+      d.addEventListener("close", stop, { once: true });
+      d.querySelector("#cam-cancel").onclick = () => d.close();
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
+        .then((s) => {
+          stream = s;
+          video.srcObject = s;
+          d.querySelector("#cam-msg").remove();
+          d.querySelector("#cam-shot").disabled = false;
+        })
+        .catch((e) => {
+          d.querySelector("#cam-msg").textContent =
+            e.name === "NotAllowedError"
+              ? "カメラの使用が許可されていません。ブラウザのアドレスバーの設定から、カメラを許可してください。"
+              : "カメラを起動できませんでした。カメラが接続されているか確認するか、写真のファイルを選んでください。";
+        });
+      d.querySelector("#cam-shot").onclick = () => {
+        const c = document.createElement("canvas");
+        c.width = video.videoWidth;
+        c.height = video.videoHeight;
+        c.getContext("2d").drawImage(video, 0, 0);
+        c.toBlob(
+          (blob) => {
+            if (!blob) return toast("撮影できませんでした。もう一度お試しください。");
+            const stamp = new Date().toLocaleString("ja-JP").replace(/[/: ]/g, "-");
+            d.close();
+            addFiles([new File([blob], `撮影-${stamp}.jpg`, { type: "image/jpeg" })]);
+          },
+          "image/jpeg",
+          0.9,
+        );
+      };
+    },
+  );
+}
 function materialsPage() {
   const r = current();
   if (!r) return go("hub");
@@ -538,12 +609,14 @@ function materialsPage() {
     )
     .join("");
   shell(
-    `<section class="page-header"><h1>${esc(place)}の資料を残す</h1><p>町史や文献のPDF、昔の写真を登録できます。登録した資料は、町のチャットで回答の根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDFや写真を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・JPEG・PNG・WebP、1ファイル20MBまで。</span></label>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、写真の場所のことは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">登録した資料は、いまはこの端末のブラウザに保存されます（サーバーへの保存は準備中）。</p></div></div>`,
+    `<section class="page-header"><h1>${esc(place)}の資料を残す</h1><p>町史や文献のPDF、昔の写真を登録できます。登録した資料は、町のチャットで回答の根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDFや写真を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・JPEG・PNG・WebP、1ファイル20MBまで。</span></label><div class="capture-row"><button type="button" class="secondary-btn" id="take-photo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>カメラで撮る</button><input type="file" id="camera-input" accept="image/*" capture="environment" class="sr-only" tabindex="-1"><span class="small">古い写真や資料のページを、その場で撮って残せます。</span></div>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、写真の場所のことは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">登録した資料は、いまはこの端末のブラウザに保存されます（サーバーへの保存は準備中）。</p></div></div>`,
   );
   fillThumbs();
   const input = $("#file-input"),
     drop = $(".dropzone");
   input.onchange = () => addFiles([...input.files]);
+  $("#camera-input").onchange = (e) => addFiles([...e.target.files]);
+  $("#take-photo").onclick = openCamera;
   drop.ondragover = (e) => {
     e.preventDefault();
     drop.classList.add("is-over");
@@ -735,7 +808,7 @@ function localTownAnswer(question) {
       mode: "experience",
     };
   return {
-    text: parts.join("\n\n") + "\n\nさらに詳しく知りたいときは、資料を見たり、「直接たずねる」の連絡先に聞いたりできます。",
+    text: parts.join("\n\n"),
     citations: cited,
     materials: [...fromTown([...materials]), ...matMaterials],
     askable: false,
@@ -772,26 +845,30 @@ function renderAnswer(m, idx) {
       (_, n) =>
         `<button class="cite" data-msg="${idx}" data-cite="${n - 1}" aria-label="根拠${n}を見る">${n}</button>`,
     );
+  // 根拠は回答の下に1行の札で。押すと抜粋が開く（主張の横の番号と同じもの）
   const cites = (m.citations || [])
     .map(
       (c, i) =>
-        `<li><button class="cite-row" data-msg="${idx}" data-cite="${i}"><span class="cite-no">${i + 1}</span><span><strong>${esc(c.title)}</strong><small>${esc(c.author)}・${esc(c.year)}・${esc(c.kind)}</small></span></button></li>`,
+        `<button class="src-chip" data-msg="${idx}" data-cite="${i}"><b>${i + 1}</b>${esc(c.title.replace(/^「|」$/g, ""))}</button>`,
     )
     .join("");
+  const citedIds = new Set((m.citations || []).map((c) => c.id));
+  // 資料の案内は、根拠に挙げていないものだけ（重複させない）
   const mats = (m.materials || [])
+    .filter((s) => !citedIds.has(s.id))
     .map(
       (s) =>
         `<li class="material ${s.fileId ? "has-file" : ""}">${s.fileId ? thumbHtml({ id: s.fileId, kind: s.fileKind }) : ""}<div><span class="material-kind">${esc(s.kind)}</span><strong>${esc(s.title)}</strong><small>${esc(s.where || "")}</small>${s.fileId ? `<button class="text-btn" data-open="${s.fileId}">資料を開く</button>` : ""}</div></li>`,
     )
     .join("");
   const n = (m.citations || []).length;
-  return `<div class="msg assistant ${m.fresh ? "is-new" : ""}"><p class="who">${logo(18)}ツギテ　${n ? `資料${n}件をもとに回答` : "資料に記録がありません"}${m.mode === "experience" ? "（体験用）" : ""}</p><div class="answer"><p class="answer-text">${body}</p>${cites ? `<div class="answer-sources"><p class="answer-label">この回答の根拠</p><ol class="cite-list">${cites}</ol></div>` : ""}${mats ? `<div class="answer-materials"><p class="answer-label">こんな資料があります</p><ul class="material-list">${mats}</ul></div>` : ""}${m.askable ? `<div class="answer-ask"><button class="secondary-btn" data-ask="${idx}">この質問を地域の人に聞く</button><span class="small">語り部への次の聞き取りのテーマになります。</span></div>` : ""}</div></div>`;
+  return `<div class="msg assistant ${m.fresh ? "is-new" : ""}"><p class="who">${logo(18)}ツギテ　${n ? `資料${n}件をもとに回答` : "資料に記録がありません"}${m.mode === "experience" ? "（体験用）" : ""}</p><div class="answer"><p class="answer-text">${body}</p>${cites ? `<div class="src-row"><span class="src-label">根拠</span>${cites}</div>` : ""}${mats ? `<div class="answer-materials"><p class="answer-label">こんな資料もあります</p><ul class="material-list">${mats}</ul></div>` : ""}${m.askable ? `<div class="answer-ask"><button class="secondary-btn" data-ask="${idx}">この質問を地域の人に聞く</button><span class="small">語り部への次の聞き取りのテーマになります。</span></div>` : ""}</div></div>`;
 }
 function contactsHtml(town) {
   if (town)
     return `<ul class="contact-list">${town.contacts.map((c) => `<li><strong>${esc(c.name)}</strong><span>${esc(c.role)}</span><a class="tel" href="tel:${c.tel.replace(/-/g, "")}">${phoneIcon}${esc(c.tel)}</a><small>${esc(c.hours)}</small></li>`).join("")}</ul><p class="small">電話番号はデモ用の架空のものです。</p>`;
   const q = (w) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeName + " " + w)}`;
-  return `<p class="small">この町の連絡先は、まだ登録されていません。次の窓口で、町の歴史を教えてもらえることがあります。</p><ul class="contact-list"><li><strong>図書館の郷土資料コーナー</strong><span>町史や古い地図、写真の資料</span><a href="${q("図書館")}" target="_blank" rel="noopener">近くの図書館を地図で探す</a></li><li><strong>公民館・地区センター</strong><span>地域の行事や語り部の紹介</span><a href="${q("公民館")}" target="_blank" rel="noopener">近くの公民館を地図で探す</a></li><li><strong>役所の文化財・生涯学習の担当</strong><span>史跡や地名の由来について</span><a href="${q("役所")}" target="_blank" rel="noopener">役所を地図で探す</a></li></ul>`;
+  return `<p class="small">この町の連絡先は、まだ登録されていません。次の窓口で、町の歴史を教えてもらえることがあります。</p><ul class="contact-list"><li><strong>図書館の郷土資料コーナー</strong><span>町史や古い地図、写真の資料</span><a href="${q("図書館")}" target="_blank" rel="noopener">「${esc(placeName)} 図書館」をGoogleマップで検索</a></li><li><strong>公民館・地区センター</strong><span>地域の行事や語り部の紹介</span><a href="${q("公民館")}" target="_blank" rel="noopener">「${esc(placeName)} 公民館」をGoogleマップで検索</a></li><li><strong>役所の文化財・生涯学習の担当</strong><span>史跡や地名の由来について</span><a href="${q("役所")}" target="_blank" rel="noopener">「${esc(placeName)} 役所」をGoogleマップで検索</a></li></ul><p class="map-note">${esc(placeName)}の周辺を検索します（あなたの現在地ではありません）。</p>`;
 }
 function placePage() {
   if (!placeName) return go("hub");
@@ -800,7 +877,7 @@ function placePage() {
     log = townChats[placeName] || [],
     stories = placeRequests().filter((r) => r.card),
     uploads = placeMaterials();
-  const intro = `<div class="msg assistant"><p class="who">${logo(18)}ツギテ</p><div class="answer"><p class="answer-text">${esc(placeName)}について、登録された資料と、地域の方が確かめた語りをもとにお答えします。答えには、参照した資料を番号で示します。わからないことは推測せず、地域の方に聞く質問として残せます。</p></div></div>`;
+  const intro = `<div class="msg assistant"><p class="who">${logo(18)}ツギテ</p><div class="answer"><p class="answer-text">${esc(placeName)}について、資料と地域の方の語りをもとにお答えします。根拠は番号で示し、わからないことは推測しません。下の質問例からどうぞ。</p></div></div>`;
   const msgs = log
     .map((m, i) =>
       m.role === "user"

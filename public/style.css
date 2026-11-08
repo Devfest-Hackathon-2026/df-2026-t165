@@ -222,7 +222,7 @@ main {
 }
 .nav-record {
   margin-top: 10px;
-  border: 1px dashed var(--contour);
+  border: 1px solid var(--contour);
 }
 .side-history summary {
   display: flex;
@@ -753,7 +753,7 @@ textarea.field {
 }
 .empty-note {
   padding: 20px;
-  border: 1px dashed var(--contour);
+  border: 1px solid var(--contour);
   border-radius: var(--r-m);
   color: var(--ink-2);
   font-size: 14px;
@@ -888,7 +888,7 @@ textarea.field {
 }
 .choice-sm {
   padding: 8px 14px;
-  border: 1px dashed var(--contour);
+  border: 1px solid var(--contour);
   border-radius: 99px;
   font-size: 13px;
   color: var(--ink-2);
@@ -1628,7 +1628,7 @@ dialog label {
 }
 .answer-sources {
   padding-top: 12px;
-  border-top: 1px dashed var(--contour);
+  border-top: 1px solid var(--contour);
 }
 .cite-list,
 .material-list,
@@ -1804,7 +1804,7 @@ dialog label {
   justify-items: center;
   gap: 6px;
   padding: 36px 20px;
-  border: 2px dashed var(--contour);
+  border: 2px solid var(--contour);
   border-radius: var(--r-m);
   background: var(--paper);
   text-align: center;
@@ -3170,4 +3170,469 @@ h3,
 .hub-card.is-main::after {
   border-color: var(--hinoki);
   opacity: 0.45;
+}
+
+/* 見出しは一括でフェードイン（1文字ずつは読みにくいため） */
+.typed::after {
+  display: none;
+}
+.is-entering .intake-q {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.is-entering.is-ready .intake-q {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* 戻る・ホームはボタンとして下に並べる */
+.intake-back {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+.intake-back .back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 12px;
+  border: 1px solid var(--contour);
+  background: var(--sheet);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+}
+.intake-back .back-btn:hover {
+  border-color: var(--ai);
+  color: var(--ai);
+}
+.intake-back .back-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.map-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+/* =========================================================
+   チャットに目が行く配置
+   ・町の帯は細く（見出しの役目だけ）、チャット欄を一番大きく・一番明るく
+   ・根拠は回答の下に1行の札、資料の案内は重複させない
+   ・脇の欄は背景になじませ、二次情報として控えめに
+   ========================================================= */
+.town {
+  gap: 14px;
+}
+.town-band {
+  min-height: 0 !important;
+  align-items: center;
+  padding: 14px 24px;
+  margin-top: 12px;
+  border-radius: 14px;
+}
+.band-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+.band-kicker {
+  display: none;
+}
+.town-band h1 {
+  font-size: 26px;
+  letter-spacing: 0.1em;
+}
+.band-sub {
+  font-size: 12px;
+}
+.band-actions {
+  margin-top: 0 !important;
+  margin-left: auto;
+}
+.band-btn {
+  min-height: 40px;
+  font-size: 13px;
+}
+.band-lanterns {
+  display: none;
+  width: 150px !important;
+  top: -10px !important;
+  right: 50% !important;
+  opacity: 0.85;
+}
+.town-layout {
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 28px;
+}
+.town-chat {
+  background: #fffdf8;
+  border: 1px solid var(--contour);
+  box-shadow: 0 18px 40px rgba(28, 58, 110, 0.1), 0 2px 6px rgba(28, 58, 110, 0.06);
+  height: max(480px, calc(100vh - 205px));
+}
+.town-chat .chat-log {
+  padding: 28px 32px;
+  gap: 22px;
+}
+.town-chat .msg.assistant {
+  max-width: 92%;
+}
+.town-chat .answer {
+  padding: 18px 22px;
+  gap: 12px;
+}
+.src-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.src-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  margin-right: 2px;
+}
+.src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px 4px 4px;
+  border-radius: 99px;
+  border: 1px solid var(--rule);
+  background: var(--sheet);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.src-chip b {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--asagi-wash);
+  color: var(--asagi-deep);
+  font-size: 11px;
+}
+.src-chip:hover {
+  border-color: var(--asagi);
+  color: var(--asagi-deep);
+}
+.answer-materials .material {
+  padding: 8px 12px;
+}
+.answer-materials .material small {
+  display: none;
+}
+/* 脇の欄：二次情報として控えめに */
+.town-side {
+  opacity: 0.94;
+}
+.town-side .seg-tabs {
+  background: transparent;
+  padding: 0;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+}
+.town-side .seg {
+  border-radius: 0;
+  min-height: 38px;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+}
+.town-side .seg[aria-selected="true"] {
+  border-bottom-color: var(--shu-bright);
+}
+.town-side .contact-list {
+  gap: 0;
+}
+.town-side .contact-list li {
+  padding: 12px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
+}
+.town-side .contact-list .tel {
+  font-size: 16px;
+}
+.town-side .contact-list strong {
+  font-size: 14px;
+}
+@media (max-width: 960px) {
+  .town-band {
+    padding: 12px 16px;
+  }
+  .band-lanterns {
+    display: none;
+  }
+  .band-actions {
+    margin-left: 0;
+  }
+  .town-chat {
+    height: max(440px, calc(100vh - 250px));
+  }
+  .town-chat .chat-log {
+    padding: 18px 14px;
+  }
+}
+
+/* =========================================================
+   画像タイル（Spotifyの初期設定のように、絵で選ぶ）
+   ========================================================= */
+.intake:not(.hub) {
+  max-width: 880px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  gap: 14px;
+}
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  text-align: left;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+.tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(28, 58, 110, 0.14);
+}
+.tile-art {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.tile-art img,
+.tile-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+.tile:hover .tile-art img,
+.tile:hover .tile-art svg {
+  transform: scale(1.05);
+}
+.tile-label {
+  padding: 12px 14px 14px;
+  font-family: var(--mincho);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.tile-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 250, 240, 0.85);
+  border: 2px solid rgba(43, 39, 35, 0.25);
+  color: transparent;
+  transform: scale(0.85);
+  transition:
+    transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1.4),
+    background 0.2s ease;
+}
+.tile-check svg {
+  width: 16px;
+  height: 16px;
+}
+.tile[data-v] .tile-check {
+  display: none;
+}
+.tile[aria-pressed="true"] {
+  border-color: var(--shu);
+  box-shadow: 0 0 0 3px var(--shu) inset, 0 10px 22px rgba(200, 60, 34, 0.18);
+}
+.tile[aria-pressed="true"] .tile-check {
+  background: var(--shu);
+  border-color: var(--shu);
+  color: #fff;
+  transform: scale(1);
+}
+.tile[aria-pressed="true"] .tile-art img,
+.tile[aria-pressed="true"] .tile-art svg {
+  transform: scale(1.04);
+}
+#multi-form {
+  display: grid;
+  gap: 14px;
+}
+@media (max-width: 820px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .tile-label {
+    font-size: 15px;
+    padding: 10px 12px 12px;
+  }
+}
+
+/* =========================================================
+   地図で絞り込む
+   ========================================================= */
+.map-slot {
+  margin-top: 4px;
+}
+.mp {
+  display: grid;
+  gap: 12px;
+}
+.mp-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.mp-crumb {
+  color: var(--ai);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.mp-crumbs b {
+  color: var(--ink);
+}
+.mp-map {
+  height: 380px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--contour);
+  background: #e9eef2;
+  box-shadow: 0 10px 24px rgba(28, 58, 110, 0.1);
+}
+.mp-map.is-off {
+  display: none;
+}
+.mp-pin {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  padding: 6px 12px;
+  border-radius: 99px;
+  background: var(--sheet);
+  border: 2px solid var(--ai);
+  color: var(--ai);
+  font-family: var(--mincho);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(28, 58, 110, 0.2);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.mp-pin:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+.mp-pin.is-on {
+  background: var(--shu);
+  border-color: var(--shu);
+  color: #fff;
+}
+.mp-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mp-opt {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 99px;
+  border: 1px solid var(--contour);
+  background: var(--sheet);
+  font-size: 14px;
+}
+.mp-opt:hover {
+  border-color: var(--ai);
+}
+.mp-opt.is-on {
+  background: var(--shu);
+  border-color: var(--shu);
+  color: #fff;
+}
+.mp-hint {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.leaflet-container {
+  font-family: var(--gothic);
+}
+@media (max-width: 820px) {
+  .mp-map {
+    height: 300px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile-art img,
+  .tile-art svg,
+  .tile-check {
+    transition: none;
+  }
+}
+.capture-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 16px;
+}
+.camera-box {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #1c1a18;
+  aspect-ratio: 4 / 3;
+  margin-top: 12px;
+}
+.camera-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.camera-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  margin: 0 !important;
+  color: #fff;
+  text-align: center;
+  font-size: 14px;
 }
