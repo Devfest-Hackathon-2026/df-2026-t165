@@ -9,6 +9,7 @@ import {
   answerKeys,
 } from "./domain.js";
 import { townData } from "./town-data.js";
+import { putFile, deleteFile, fileUrl, kindOf, MAX_BYTES, ACCEPT } from "./material-store.js";
 const $ = (s) => document.querySelector(s),
   esc = (v) =>
     String(v ?? "").replace(
@@ -106,7 +107,9 @@ function shell(content) {
       (b.onclick = () => {
         active = b.dataset.request;
         go(
-          current().status === "requested"
+          current().kind === "materials" && current().status === "requested"
+            ? "materials"
+            : current().status === "requested"
             ? "request"
             : current().status === "interview"
               ? "interview"
@@ -142,6 +145,7 @@ function render() {
   else if (page === "home") home();
   else if (page === "regions") regions();
   else if (page === "place") placePage();
+  else if (page === "materials") materialsPage();
   else if (page === "request") requestPage();
   else if (page === "interview") interview();
   else if (page === "review") review();
@@ -209,7 +213,7 @@ const choiceList = (items, cls = "") =>
 function intakeStep() {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (!a.purpose) return "purpose";
-  if (a.purpose === "record") return a.place ? "done" : "place";
+  if (a.purpose === "record") return !a.place ? "place" : a.how ? "done" : "how";
   if (!a.knows) return "knows";
   if (a.knows === "yes") {
     if (!a.place) return "place";
@@ -220,7 +224,7 @@ function intakeStep() {
 }
 function finishIntake() {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
-  if (a.purpose === "record") return startRecording(a.place);
+  if (a.purpose === "record") return startRecording(a.place, a.how);
   if (a.place) {
     const t = topics.find(([k]) => k === a.topic);
     const first = t ? (t[0] === "names" ? `「${a.place}」` : a.place) + t[2] : a.topic && a.topic !== "none" ? a.topic : "";
@@ -231,13 +235,28 @@ function finishIntake() {
   if (box) box.innerHTML = '<p class="searching" role="status">お答えに合う地域を探しています</p>';
   setTimeout(() => go("regions"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 900);
 }
-function startRecording(place) {
+function startRecording(place, how = "talk") {
   const demo = /青葉/.test(place);
-  const r = demo
+  if (how === "files") {
+    const existing = state.requests.find((x) => x.kind === "materials" && x.place === place);
+    if (existing) {
+      active = existing.id;
+      return go("materials");
+    }
+  }
+  const r =
+    how === "files"
+      ? create(`${place}の資料（PDF・写真）`, demo, demo ? DEMO.event : place, "町の資料")
+      : demo
     ? create(DEMO.question, true)
     : create(`${place}について、残しておきたいお話を聞かせてください。`, false, place, "町の記録");
   if (!r) return;
   r.place = place;
+  if (how === "files") {
+    r.kind = "materials";
+    save();
+    return go("materials");
+  }
   save();
   beginInterview();
 }
@@ -257,6 +276,15 @@ function questionFor(step) {
       q: a.purpose === "record" ? "どの町のお話を残しますか？" : "どの町のことを知りたいですか？",
       hint: "市町村名でも、地区や通りの名前でも大丈夫です。",
       body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button>${a.purpose === "view" ? '<button class="choice-sm" data-switch="unknown">町の名前が決まっていない</button>' : ""}</div>`,
+    };
+  if (step === "how")
+    return {
+      q: "どんな形で残しますか？",
+      hint: "あとから、もう一方も追加できます。",
+      body: choiceList([
+        ["talk", "話して残す", "聞き役のAIが質問しながら、お話を文字にします"],
+        ["files", "資料を登録する", "町史や文献のPDF、昔の写真をアップロードします"],
+      ]),
     };
   if (step === "topic")
     return {
@@ -376,6 +404,163 @@ function openPlace(name, question = "") {
   pendingAsk = question;
   go("place");
 }
+// ---------- 資料（PDF・写真）を残す ----------
+let pendingFiles = [];
+const visibilities = [
+  ["town", "町の人だけ"],
+  ["keepers", "行事の担い手だけ"],
+  ["public", "だれでも"],
+];
+const visLabel = (v) => visibilities.find(([k]) => k === v)?.[1] || "町の人だけ";
+const fmtSize = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB");
+function addFiles(list) {
+  for (const file of list) {
+    const kind = kindOf(file.type);
+    if (!kind) {
+      toast(`「${file.name}」は登録できない形式です。PDF、JPEG、PNG、WebPを選んでください。`);
+      continue;
+    }
+    if (file.size > MAX_BYTES) {
+      toast(`「${file.name}」は20MBを超えています。小さくしてから登録してください。`);
+      continue;
+    }
+    pendingFiles.push({
+      id: crypto.randomUUID(),
+      file,
+      kind,
+      preview: kind === "写真" ? URL.createObjectURL(file) : "",
+      title: file.name.replace(/\.[^.]+$/, ""),
+      era: "",
+      source: "",
+      description: "",
+      visibility: "town",
+      consent: false,
+    });
+  }
+  materialsPage();
+}
+function thumbHtml(m, preview = "") {
+  return m.kind === "写真"
+    ? `<img class="thumb" ${preview ? `src="${preview}"` : `data-thumb="${m.id}"`} alt="">`
+    : `<span class="thumb thumb-pdf" aria-hidden="true">PDF</span>`;
+}
+async function fillThumbs(root = document) {
+  for (const img of root.querySelectorAll("[data-thumb]")) {
+    const url = await fileUrl(img.dataset.thumb);
+    if (url) img.src = url;
+    else img.replaceWith(Object.assign(document.createElement("span"), { className: "thumb thumb-missing", textContent: "この端末にありません" }));
+  }
+}
+async function openMaterial(id) {
+  const url = await fileUrl(id);
+  if (!url) return toast("この資料のファイルは、この端末に保存されていません。");
+  window.open(url, "_blank", "noopener");
+}
+function materialsPage() {
+  const r = current();
+  if (!r) return go("welcome");
+  const place = r.place || r.event,
+    saved = r.materials || [];
+  const pending = pendingFiles
+    .map(
+      (p, i) =>
+        `<form class="upload-item" data-pending="${i}">${thumbHtml(p, p.preview)}<div class="upload-fields"><p class="upload-name">${esc(p.file.name)}<small>${p.kind}・${fmtSize(p.file.size)}</small></p><label class="label">資料の名前<input class="field" name="title" value="${esc(p.title)}" required maxlength="120"></label><div class="row-2"><label class="label">年代<input class="field" name="era" value="${esc(p.era)}" placeholder="例：昭和40年ごろ" maxlength="60"></label><label class="label">作った人・出どころ<input class="field" name="source" value="${esc(p.source)}" placeholder="例：自治会の記念誌、祖父のアルバム" maxlength="120"></label></div><label class="label">${p.kind === "写真" ? "何が写っていますか" : "どんなことが書かれていますか"}<textarea class="field" name="description" maxlength="1000" placeholder="${p.kind === "写真" ? "例：駅ができる前の田んぼ。奥に見えるのが今の公民館のあたり。" : "例：夏祭りが始まった経緯と、最初の年の写真がのっている。"}">${esc(p.description)}</textarea></label><label class="label">見られる人<select class="field" name="visibility">${visibilities.map(([v, l]) => `<option value="${v}" ${p.visibility === v ? "selected" : ""}>${l}</option>`).join("")}</select></label><label class="check"><input type="checkbox" name="consent" ${p.consent ? "checked" : ""}>${p.kind === "写真" ? "写っている人や持ち主に、残してよいか確認しました。" : "この資料を共有してよいか、持ち主や作った人に確認しました。"}</label><div class="upload-actions"><button class="primary-btn">登録する</button><button type="button" class="text-btn" data-cancel="${i}">取り消す</button></div></div></form>`,
+    )
+    .join("");
+  const list = saved
+    .map(
+      (m) =>
+        `<li class="saved-item">${thumbHtml(m)}<div><strong>${esc(m.title)}</strong><small>${esc(m.kind)}${m.era ? "・" + esc(m.era) : ""}・${visLabel(m.visibility)}</small>${m.description ? `<p class="small">${esc(m.description)}</p>` : ""}<div class="saved-actions"><button class="text-btn" data-open="${m.id}">開く</button><button class="text-btn danger" data-remove="${m.id}">削除</button></div></div></li>`,
+    )
+    .join("");
+  shell(
+    `<section class="page-header"><h1>${esc(place)}の資料を残す</h1><p>町史や文献のPDF、昔の写真を登録できます。登録した資料は、町のチャットで回答の根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDFや写真を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・JPEG・PNG・WebP、1ファイル20MBまで。</span></label>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、写真の場所のことは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">登録した資料は、いまはこの端末のブラウザに保存されます（サーバーへの保存は準備中）。</p></div></div>`,
+  );
+  fillThumbs();
+  const input = $("#file-input"),
+    drop = $(".dropzone");
+  input.onchange = () => addFiles([...input.files]);
+  drop.ondragover = (e) => {
+    e.preventDefault();
+    drop.classList.add("is-over");
+  };
+  drop.ondragleave = () => drop.classList.remove("is-over");
+  drop.ondrop = (e) => {
+    e.preventDefault();
+    drop.classList.remove("is-over");
+    addFiles([...e.dataTransfer.files]);
+  };
+  document.querySelectorAll("[data-pending]").forEach((form) => {
+    const p = pendingFiles[form.dataset.pending];
+    form.oninput = form.onchange = (e) => {
+      const t = e.target;
+      if (t.name) p[t.name] = t.type === "checkbox" ? t.checked : t.value;
+    };
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (!p.title.trim()) return toast("資料の名前を入れてください。");
+      if (!p.consent) return toast("残してよいかの確認にチェックを入れてください。");
+      try {
+        await putFile(p.id, p.file);
+      } catch {
+        return toast("この端末に保存できませんでした。ブラウザの容量を確認してください。");
+      }
+      r.materials ||= [];
+      r.materials.push({
+        id: p.id,
+        kind: p.kind,
+        type: p.file.type,
+        name: p.file.name,
+        size: p.file.size,
+        title: p.title.trim().slice(0, 120),
+        era: p.era.trim().slice(0, 60),
+        source: p.source.trim().slice(0, 120),
+        description: p.description.trim().slice(0, 1000),
+        visibility: p.visibility,
+        addedBy: r.speaker,
+        addedAt: new Date().toISOString(),
+      });
+      if (p.preview) URL.revokeObjectURL(p.preview);
+      pendingFiles = pendingFiles.filter((x) => x !== p);
+      save();
+      toast(`「${p.title}」を登録しました。`);
+      materialsPage();
+    };
+  });
+  document.querySelectorAll("[data-cancel]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const p = pendingFiles[b.dataset.cancel];
+        if (p?.preview) URL.revokeObjectURL(p.preview);
+        pendingFiles.splice(b.dataset.cancel, 1);
+        materialsPage();
+      }),
+  );
+  document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openMaterial(b.dataset.open)));
+  document.querySelectorAll("[data-remove]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const m = r.materials.find((x) => x.id === b.dataset.remove);
+        modal(
+          `<h2>資料を削除しますか？</h2><p>「${esc(m.title)}」を削除します。この端末からファイルも消え、元に戻せません。</p><div class="dialog-actions"><button class="secondary-btn" data-close>やめる</button><button class="primary-btn" id="do-remove">削除する</button></div>`,
+          () =>
+            ($("#do-remove").onclick = async () => {
+              r.materials = r.materials.filter((x) => x !== m);
+              try {
+                await deleteFile(m.id);
+              } catch {}
+              save();
+              $("#dialog").close();
+              toast("資料を削除しました。");
+              materialsPage();
+            }),
+        );
+      }),
+  );
+  $("#to-talk").onclick = beginInterview;
+  $("#to-town").onclick = () => openPlace(place);
+}
+
 // ---------- 町のチャット：AIが資料をもとに答え、根拠と連絡先を示す ----------
 const chatKey = "tsugite-town-chats-v1";
 let townChats = {};
@@ -396,6 +581,42 @@ function placeRequests() {
     return n && (e.includes(n) || n.includes(e.replace(/の.*$/, "")));
   });
 }
+function placeMaterials() {
+  return placeRequests().flatMap((r) => (r.materials || []).map((m) => ({ ...m, requestId: r.id })));
+}
+// 日本語の質問と資料の説明を、漢字・カタカナを含む2文字の重なりで照らし合わせる
+const bigrams = (t) => {
+  const s = String(t).replace(/[\s、。「」『』！？!?・（）()]/g, ""),
+    out = new Set();
+  for (let i = 0; i < s.length - 1; i++) {
+    const b = s.slice(i, i + 2);
+    if (/[\u4e00-\u9fff\u30a0-\u30ff]/.test(b)) out.add(b);
+  }
+  return out;
+};
+function matchMaterials(question) {
+  const q = bigrams(question.replaceAll(placeName, ""));
+  return placeMaterials()
+    .map((m) => {
+      const t = bigrams(`${m.title} ${m.era} ${m.source} ${m.description}`);
+      return { m, score: [...q].filter((b) => t.has(b)).length };
+    })
+    .filter((x) => x.score >= 2)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((x) => x.m);
+}
+const materialSource = (m) => ({
+  id: "mat-" + m.id,
+  title: `「${m.title}」`,
+  author: m.source || `${m.addedBy || "住民"}が登録`,
+  year: m.era || "年代不明",
+  kind: `${m.kind}（住民が登録）`,
+  excerpt: m.description || "説明は登録されていません",
+  where: "住民の方がツギテに登録した資料です",
+  fileId: m.id,
+  fileKind: m.kind,
+});
 // 体験用の回答。登録された資料と、語り手が確認した手引きだけを根拠にする
 function localTownAnswer(question) {
   const town = townData(placeName),
@@ -429,6 +650,14 @@ function localTownAnswer(question) {
       `地域の方の語りでは、${keys.map((k) => `${r.card.facts[k].label}は「${r.card.facts[k].value}」`).join("、")}とのことです${cite(src)}。`,
     );
   }
+  const matMaterials = [];
+  for (const m of matchMaterials(question)) {
+    const src = materialSource(m);
+    matMaterials.push(src);
+    parts.push(
+      `住民の方が登録した${m.kind}「${m.title}」${m.era ? `（${m.era}）` : ""}があります${cite(src)}。${m.description ? `説明には「${m.description.slice(0, 80)}${m.description.length > 80 ? "…" : ""}」とあります。` : ""}`,
+    );
+  }
   const fromTown = (ids) => (town ? ids.map((id) => town.sources.find((s) => s.id === id)) : []);
   if (!parts.length)
     return {
@@ -443,7 +672,7 @@ function localTownAnswer(question) {
   return {
     text: parts.join("\n\n") + "\n\nさらに詳しく知りたいときは、資料を見たり、「直接たずねる」の連絡先に聞いたりできます。",
     citations: cited,
-    materials: fromTown([...materials]),
+    materials: [...fromTown([...materials]), ...matMaterials],
     askable: false,
     mode: "experience",
   };
@@ -487,7 +716,7 @@ function renderAnswer(m, idx) {
   const mats = (m.materials || [])
     .map(
       (s) =>
-        `<li class="material"><span class="material-kind">${esc(s.kind)}</span><strong>${esc(s.title)}</strong><small>${esc(s.where || "")}</small></li>`,
+        `<li class="material ${s.fileId ? "has-file" : ""}">${s.fileId ? thumbHtml({ id: s.fileId, kind: s.fileKind }) : ""}<div><span class="material-kind">${esc(s.kind)}</span><strong>${esc(s.title)}</strong><small>${esc(s.where || "")}</small>${s.fileId ? `<button class="text-btn" data-open="${s.fileId}">資料を開く</button>` : ""}</div></li>`,
     )
     .join("");
   return `<div class="msg assistant"><p class="who">ツギテ${m.mode === "experience" ? "（体験用の回答）" : ""}</p><div class="answer"><p class="answer-text">${body}</p>${cites ? `<div class="answer-sources"><p class="answer-label">この回答の根拠</p><ol class="cite-list">${cites}</ol></div>` : ""}${mats ? `<div class="answer-materials"><p class="answer-label">こんな資料があります</p><ul class="material-list">${mats}</ul></div>` : ""}${m.askable ? `<div class="answer-ask"><button class="secondary-btn" data-ask="${idx}">この質問を地域の人に聞く</button><span class="small">語り部への次の聞き取りのテーマになります。</span></div>` : ""}</div></div>`;
@@ -503,7 +732,8 @@ function placePage() {
   const town = townData(placeName),
     region = Object.values(regionInfo).find((r) => r.name === placeName),
     log = townChats[placeName] || [],
-    stories = placeRequests().filter((r) => r.card);
+    stories = placeRequests().filter((r) => r.card),
+    uploads = placeMaterials();
   const intro = `<div class="msg assistant"><p class="who">ツギテ</p><div class="answer"><p class="answer-text">${esc(placeName)}について、登録された資料と、地域の方が確かめた語りをもとにお答えします。答えには、どの資料を参照したかを番号で示します。わからないことは推測せず、地域の方に聞く質問として残せます。</p>${town ? `<div class="suggest">${town.suggestions.map((s) => `<button class="choice-sm" data-suggest="${esc(s)}">${esc(s)}</button>`).join("")}</div>` : ""}</div></div>`;
   const msgs = log
     .map((m, i) =>
@@ -513,7 +743,7 @@ function placePage() {
     )
     .join("");
   shell(
-    `<div class="town-layout"><section class="town-chat chat" aria-label="${esc(placeName)}について聞く"><header class="chat-top"><h1>${esc(placeName)}について聞く</h1><a class="jump-contacts" href="#contacts">連絡先を見る</a><small>${config.aiReady ? "Google AI" : "体験モード"}</small></header><div class="chat-log" aria-live="polite">${intro}${msgs}${townBusy ? '<div class="msg assistant"><p class="who">ツギテ</p><p class="bubble searching" role="status">資料を調べています</p></div>' : ""}</div><form class="chat-bottom" id="town-form"><div class="composer"><label class="sr-only" for="town-q">町について聞きたいこと</label><textarea id="town-q" rows="2" maxlength="1000" placeholder="町について聞きたいことを入力" ${townBusy ? "disabled" : ""}>${esc(placeDraft)}</textarea><button type="button" class="round" id="dictate" aria-label="声で入力する">${icon("mic")}</button><button class="round primary" aria-label="質問する" ${townBusy ? "disabled" : ""}>${icon("send")}</button></div></form></section><div class="town-side" role="complementary" aria-label="${esc(placeName)}の情報"><section class="town-name"><h2>${esc(placeName)}</h2><p>${town ? town.note : region ? region.position : "地域の記録"}</p></section><section class="side-card" id="contacts"><h3>直接たずねる</h3>${contactsHtml(town)}</section><section class="side-card"><h3>この町の資料</h3>${town ? `<ul class="material-list compact">${town.sources.map((s) => `<li class="material"><span class="material-kind">${esc(s.kind)}</span><strong>${esc(s.title)}</strong><small>${esc(s.where)}</small></li>`).join("")}</ul>` : '<p class="small">まだ登録されていません。</p>'}${stories.length ? `<p class="answer-label">地域の方の語り（確認済み）</p><ul class="story-list">${stories.map((r) => `<li><button class="story" data-request="${r.id}"><span class="story-q">${esc(r.card.title)}</span><span class="story-meta">${esc(r.speaker)}</span></button></li>`).join("")}</ul>` : ""}</section><section class="side-actions"><a class="secondary-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(region ? region.query : placeName)}" target="_blank" rel="noopener">地図で場所を見る</a><button class="text-btn" id="record-here">この町の話を残す</button></section></div></div>`,
+    `<div class="town-layout"><section class="town-chat chat" aria-label="${esc(placeName)}について聞く"><header class="chat-top"><h1>${esc(placeName)}について聞く</h1><a class="jump-contacts" href="#contacts">連絡先を見る</a><small>${config.aiReady ? "Google AI" : "体験モード"}</small></header><div class="chat-log" aria-live="polite">${intro}${msgs}${townBusy ? '<div class="msg assistant"><p class="who">ツギテ</p><p class="bubble searching" role="status">資料を調べています</p></div>' : ""}</div><form class="chat-bottom" id="town-form"><div class="composer"><label class="sr-only" for="town-q">町について聞きたいこと</label><textarea id="town-q" rows="2" maxlength="1000" placeholder="町について聞きたいことを入力" ${townBusy ? "disabled" : ""}>${esc(placeDraft)}</textarea><button type="button" class="round" id="dictate" aria-label="声で入力する">${icon("mic")}</button><button class="round primary" aria-label="質問する" ${townBusy ? "disabled" : ""}>${icon("send")}</button></div></form></section><div class="town-side" role="complementary" aria-label="${esc(placeName)}の情報"><section class="town-name"><h2>${esc(placeName)}</h2><p>${town ? town.note : region ? region.position : "地域の記録"}</p></section><section class="side-card" id="contacts"><h3>直接たずねる</h3>${contactsHtml(town)}</section><section class="side-card"><h3>この町の資料</h3>${town || uploads.length ? `<ul class="material-list compact">${(town ? town.sources : []).map((s) => `<li class="material"><span class="material-kind">${esc(s.kind)}</span><strong>${esc(s.title)}</strong><small>${esc(s.where)}</small></li>`).join("")}${uploads.map((m) => `<li class="material has-file">${thumbHtml(m)}<div><span class="material-kind">${esc(m.kind)}（住民が登録）</span><strong>${esc(m.title)}</strong><small>${esc(m.era || "年代不明")}・${visLabel(m.visibility)}</small><button class="text-btn" data-open="${m.id}">開く</button></div></li>`).join("")}</ul>` : '<p class="small">まだ登録されていません。</p>'}<button class="text-btn" id="add-material">資料を登録する</button>${stories.length ? `<p class="answer-label">地域の方の語り（確認済み）</p><ul class="story-list">${stories.map((r) => `<li><button class="story" data-request="${r.id}"><span class="story-q">${esc(r.card.title)}</span><span class="story-meta">${esc(r.speaker)}</span></button></li>`).join("")}</ul>` : ""}</section><section class="side-actions"><a class="secondary-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(region ? region.query : placeName)}" target="_blank" rel="noopener">地図で場所を見る</a><button class="text-btn" id="record-here">この町の話を残す</button></section></div></div>`,
   );
   const logEl = $(".chat-log"),
     lastQ = [...logEl.querySelectorAll(".msg.user")].at(-1);
@@ -540,13 +770,16 @@ function placePage() {
         const c = log[b.dataset.msg]?.citations?.[b.dataset.cite];
         if (!c) return;
         modal(
-          `<h2>根拠 ${Number(b.dataset.cite) + 1}</h2><p><strong>${esc(c.title)}</strong><br>${esc(c.author)}　${esc(c.year)}　${esc(c.kind)}</p><blockquote class="source-quote">${esc(c.excerpt || "抜粋は登録されていません").replace(/\n/g, "<br>")}</blockquote>${c.where ? `<p class="small">${esc(c.where)}</p>` : ""}${c.url ? `<p><a href="${esc(c.url)}" target="_blank" rel="noopener">資料を開く</a></p>` : ""}<div class="dialog-actions">${c.requestId ? `<button class="secondary-btn" id="open-card">語りの手引きを見る</button>` : ""}<button class="primary-btn" data-close>閉じる</button></div>`,
-          () =>
+          `<h2>根拠 ${Number(b.dataset.cite) + 1}</h2><p><strong>${esc(c.title)}</strong><br>${esc(c.author)}　${esc(c.year)}　${esc(c.kind)}</p><blockquote class="source-quote">${esc(c.excerpt || "抜粋は登録されていません").replace(/\n/g, "<br>")}</blockquote>${c.where ? `<p class="small">${esc(c.where)}</p>` : ""}${c.fileId ? (c.fileKind === "写真" ? `<img class="cite-photo" data-thumb="${c.fileId}" alt="${esc(c.title)}">` : `<p><button class="secondary-btn" data-open="${c.fileId}">PDFを開く</button></p>`) : ""}${c.url ? `<p><a href="${esc(c.url)}" target="_blank" rel="noopener">資料を開く</a></p>` : ""}<div class="dialog-actions">${c.requestId ? `<button class="secondary-btn" id="open-card">語りの手引きを見る</button>` : ""}<button class="primary-btn" data-close>閉じる</button></div>`,
+          (d) => {
+            fillThumbs(d);
+            d.querySelector("[data-open]")?.addEventListener("click", (e) => openMaterial(e.target.dataset.open));
             $("#open-card")?.addEventListener("click", () => {
               $("#dialog").close();
               active = c.requestId;
               go("review");
-            }),
+            });
+          },
         );
       }),
   );
@@ -567,6 +800,9 @@ function placePage() {
       }),
   );
   $("#record-here").onclick = () => startRecording(placeName);
+  $("#add-material").onclick = () => startRecording(placeName, "files");
+  fillThumbs();
+  document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openMaterial(b.dataset.open)));
   if (pendingAsk && !townBusy) {
     const q = pendingAsk;
     pendingAsk = "";
@@ -640,7 +876,7 @@ function beginInterview() {
   go("interview");
 }
 function requestSide(r) {
-  return `<section class="side-card"><h3>届いている質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section>`;
+  return `<div class="review-sidebar"><section class="side-card"><h3>届いている質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section><section class="side-card"><h3>資料を添える<span class="count">${(r.materials || []).length}</span></h3><p class="small">お話に関係する文献のPDFや、昔の写真を一緒に残せます。</p><button type="button" class="secondary-btn" data-page="materials">PDF・写真を登録する</button></section></div>`;
 }
 function interview() {
   const r = current();

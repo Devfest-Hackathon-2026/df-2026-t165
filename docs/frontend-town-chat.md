@@ -61,3 +61,36 @@
 
 - 手引きの6項目（`src/domain.mjs` の `FACTS`）が提灯準備用に固定されているため、町の歴史の聞き取りでも「雨天の場所」などが出ます。
 - 町のチャットの履歴はブラウザ（`localStorage` の `tsugite-town-chats-v1`）だけに保存しています。サーバー保存の `state` には入れていません。
+
+## 資料（PDF・写真）の受け口
+
+「町の記録を残す」→「資料を登録する」で、PDF（文献・町史）と写真（JPEG・PNG・WebP、1ファイル20MBまで）を登録できます。
+
+いまの保存先：
+- ファイル本体：ブラウザのIndexedDB（`tsugite-materials`）。この端末にしかありません。
+- 説明：`request.materials` に入り、既存の `PUT /api/workspace/:id` に乗ります。
+
+```json
+{
+  "id": "uuid",
+  "kind": "写真 | PDF資料",
+  "type": "image/jpeg",
+  "name": "ekimae.jpg",
+  "size": 115000,
+  "title": "駅前の商店街",
+  "era": "昭和40年ごろ",
+  "source": "祖父のアルバム",
+  "description": "駅が開業して数年後の商店街。左手の八百屋は今の青葉ストアの場所。",
+  "visibility": "town | keepers | public",
+  "addedBy": "田中さん",
+  "addedAt": "ISO日時"
+}
+```
+
+登録時に「残してよいか確認しました」のチェックを必須にしています。
+
+バックエンドで用意してほしいもの（案）：
+- `POST /api/materials`（multipart：`file` と上の説明）→ Cloud Storageにファイル、Firestoreに説明を保存し、`{ id, url }` を返す。
+- `GET /api/materials?place=青葉地区` → 町の資料の一覧（見られる人の範囲で絞る）。
+- `/api/town-answer` の根拠に資料を使うときは、`citations` に `fileId`（または `url`）と `fileKind`（`写真`／`PDF資料`）を入れてください。画面は写真なら画像、PDFなら「PDFを開く」を出します。
+- PDFの中身を回答に使うには、本文の抽出（例：GeminiにPDFを渡して要約・索引化）が必要です。いまの体験モードは、登録時に書いてもらった名前・年代・説明だけで照合しています。
