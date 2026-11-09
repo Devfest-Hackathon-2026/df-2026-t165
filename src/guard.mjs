@@ -27,3 +27,6 @@ export function cardPrompt({request,turns,schema}){
  const text=dataBlock('依頼',JSON.stringify(request))+'\n'+dataBlock('元発言',sourceText(turns))+'\n'+REMINDER;
  return {system,text};
 }
+
+/** 記録・資料の説明に紛れ込んだ「AIへの命令」らしい文か（該当する項目は根拠にしない） */
+export const looksLikeInstruction=t=>/(ツギキキ|ＡＩ|AI|アシスタント|システム|Gemini|ジェミニ)\s*(へ|に|は)\s*[：:、,]|(と|を)(だけ)?(答える|言う|返す|書く|述べる|表示する)(こと|ように)\s*[。.]?$|(答え|表示し|無視し|従え|従い)(ろ|よ)(。|$|\s)|プロンプト|以降の(質問|回答)|これまでの指示|指示を(無視|忘れ|上書き)|ignore (all |previous )/i.test(String(t??''));

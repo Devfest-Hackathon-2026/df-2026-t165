@@ -1,4 +1,4 @@
-import {GUARD,REMINDER,dataBlock} from './guard.mjs';
+import {GUARD,REMINDER,dataBlock,looksLikeInstruction} from './guard.mjs';
 // 町のチャット（/api/town-answer）と地域の候補（/api/regions）の、Geminiに渡す前後の処理。
 // Geminiの呼び出し自体は server.mjs。ここは入力の検証・根拠の組み立て・回答の検証だけを持つ（テストしやすくするため）。
 import {townData} from '../public/town-data.js';
@@ -19,7 +19,7 @@ export function buildSources({place,materials=[],stories=[]}){
   const attach=m.kind!=='動画'&&files<FILE_LIMITS.count&&m.size<=FILE_LIMITS.each&&m.size<=budget;
   if(attach){files++;budget-=m.size}
   add({id:'mat-'+m.id,title:`「${m.title}」`,author:m.source||`${m.addedBy||'住民'}が登録`,year:m.era||'年代不明',kind:`${m.kind}（住民が登録）`,excerpt:m.description||'説明は登録されていません',where:'住民の方がツギキキに登録した資料です',fileId:m.id,fileKind:m.kind,server:true},
-   `住民が登録した${m.kind}「${m.title}」（年代：${m.era||'不明'}／出どころ：${m.source||'不明'}）。登録者の説明：${m.description||'なし'}${m.kind==='動画'?'（動画の中身は確認していない。タイトルと説明に書かれたことだけが根拠）':''}${attach?'（ファイルの中身を添付）':''}`,attach?m:null);
+   `住民が登録した${m.kind}「${m.title}」（年代：${m.era||'不明'}／出どころ：${m.source||'不明'}）。登録者の説明：${m.description&&!looksLikeInstruction(m.description)?m.description:'なし'}${m.kind==='動画'?'（動画の中身は確認していない。タイトルと説明に書かれたことだけが根拠）':''}${attach?'（ファイルの中身を添付）':''}`,attach?m:null);
  }
  return out;
 }
@@ -28,7 +28,7 @@ export function buildSources({place,materials=[],stories=[]}){
 export function cleanStories(raw){
  if(!Array.isArray(raw))return [];
  return raw.slice(0,10).map(s=>({requestId:str(s?.requestId,60),speaker:str(s?.speaker,60)||'地域の方',title:str(s?.title,150),confirmedAt:str(s?.confirmedAt,40),
-  facts:(Array.isArray(s?.facts)?s.facts:[]).slice(0,12).map(f=>({label:str(f?.label,40),value:str(f?.value,600)})).filter(f=>f.label&&f.value&&f.value!=='未確認')}))
+  facts:(Array.isArray(s?.facts)?s.facts:[]).slice(0,12).map(f=>({label:str(f?.label,40),value:str(f?.value,600)})).filter(f=>f.label&&f.value&&f.value!=='未確認'&&!looksLikeInstruction(f.value))}))
   .filter(s=>s.requestId&&s.facts.length);
 }
 export function cleanHistory(raw){
