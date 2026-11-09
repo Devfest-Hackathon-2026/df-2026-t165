@@ -7,6 +7,9 @@ import {
   reviewCard,
   assessAnswers,
   answerKeys,
+  confirmDraft,
+  queueQuestion,
+  takeNextQuestion,
 } from "./domain.js";
 import { townData } from "./town-data.js";
 import { tileArt } from "./tile-art.js";
@@ -29,12 +32,13 @@ let state;
 try {
   state = JSON.parse(localStorage.getItem(key));
 } catch {}
-state ||= { requests: [], measurements: [] };
+if (!state || !Array.isArray(state.requests) || !Array.isArray(state.measurements)) state = { requests: [], measurements: [] };
 let config = { aiReady: false, storage: "browser", requiresCode: false },
   page = "hub",
   active = state.requests[0]?.id,
   code = sessionStorage.getItem("tsugite-access") || "",
   busy = false,
+  liveAbort = null,
   test = null,
   saveMessage = "この端末に保存";
 const current = () => state.requests.find((r) => r.id === active);
@@ -45,6 +49,7 @@ const headers = () => ({
 });
 async function api(route, data) {
   const res = await fetch("/api/" + route, {
+    signal: AbortSignal.timeout(50000),
     method: data === undefined ? "GET" : "POST",
     headers: headers(),
     ...(data === undefined ? {} : { body: JSON.stringify(data) }),
@@ -79,8 +84,18 @@ function save() {
     });
   }
 }
+function stopLive() {
+  liveAbort?.abort();
+  liveAbort = null;
+}
+window.addEventListener("pagehide", stopLive);
 let entering = true;
 function go(p) {
+  if (busy) {
+    toast("処理中です。少しお待ちください。");
+    return;
+  }
+  stopLive();
   if (p !== page) entering = true;
   page = p;
   document.body.classList.remove("menu-open");
@@ -113,6 +128,8 @@ function shell(content) {
   document.querySelectorAll("[data-request]").forEach(
     (b) =>
       (b.onclick = () => {
+        if (busy) return toast("処理中です。少しお待ちください。");
+        stopLive();
         active = b.dataset.request;
         go(
           current().kind === "materials" && current().status === "requested"
@@ -973,6 +990,7 @@ function placePage() {
 }
 function create(question, sample = false, event = DEMO.event, task = DEMO.task) {
   try {
+    if (state.requests.length >= 40) throw Error("この端末では40件まで保存できます。記録を書き出してチームにご相談ください。");
     const r = validateRequest({ question, sampleData: sample, event, task, speaker: DEMO.speaker });
     state.requests.unshift(r);
     active = r.id;
@@ -999,17 +1017,15 @@ function turn(role, text) {
   return { id: crypto.randomUUID(), role, text, at: new Date().toISOString() };
 }
 function beginInterview() {
+  if (busy) return;
+  stopLive();
   let r = current();
   if (!r) return;
-  const previous = r.card;
+  const previous = r.card,
+    nextQuestion = takeNextQuestion(r);
   r.status = "interview";
-  if (r.pendingQuestions?.length)
-    r.turns.push(
-      turn(
-        "assistant",
-        "次の担い手から追加の質問です。「" + r.pendingQuestions.pop() + "」について教えていただけますか？",
-      ),
-    );
+  if (nextQuestion)
+    r.turns.push(turn("assistant", "次の担い手から追加の質問です。「" + nextQuestion + "」について教えていただけますか？"));
   else if (!r.turns.length) r.turns.push(turn("assistant", localFollowup(r, [])));
   else if (previous)
     r.turns.push(
@@ -1027,7 +1043,7 @@ function beginInterview() {
   go("interview");
 }
 function requestSide(r) {
-  return `<div class="review-sidebar"><section class="side-card"><h3>届いている質問</h3><p class="request-quote">${esc(r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section><section class="side-card"><h3>資料を添える<span class="count">${(r.materials || []).length}</span></h3><p class="small">お話に関係する文献のPDFや、昔の写真を一緒に残せます。</p><button type="button" class="secondary-btn" data-page="materials">PDF・写真を登録する</button></section></div>`;
+  return `<div class="review-sidebar"><section class="side-card"><h3>届いている質問</h3><p class="request-quote">${esc(r.currentQuestion || r.question)}</p><p class="meta">${esc(r.event)}<br>${esc(r.task)}</p><hr><label>話す人<input id="speaker" class="field" value="${esc(r.speaker)}"></label><p class="hint">「いつもの場所」も、初めての人に伝わる名前に。知らないことは、知らないままで大丈夫です。</p></section><section class="side-card"><h3>資料を添える<span class="count">${(r.materials || []).length}</span></h3><p class="small">お話に関係する文献のPDFや、昔の写真を一緒に残せます。</p><button type="button" class="secondary-btn" data-page="materials">PDF・写真を登録する</button></section></div>`;
 }
 function interview() {
   const r = current();
@@ -1055,6 +1071,7 @@ function interview() {
   $("#live")?.addEventListener("click", startLive);
 }
 async function say(text) {
+  if (liveAbort) return toast("音声会話を終了してから入力してください。");
   if (busy || !text.trim()) return;
   const r = current();
   r.turns.push(turn("user", text.trim()));
@@ -1064,7 +1081,7 @@ async function say(text) {
   try {
     const response = config.aiReady
       ? await api("followup", {
-          request: { question: r.question, event: r.event, task: r.task },
+          request: { question: r.currentQuestion || r.question, event: r.event, task: r.task },
           turns: r.turns,
           previousCard: r.card || null,
         })
@@ -1080,6 +1097,11 @@ async function say(text) {
   }
 }
 async function finish() {
+  if (liveAbort) {
+    stopLive();
+    toast("音声会話を終了しました。内容を確認してから下書きを作ってください。");
+    return;
+  }
   const r = current();
   if (!r.turns.some((t) => t.role === "user")) return toast("まず、語り手のお話をひとつ入力してください。");
   if (busy) return;
@@ -1090,6 +1112,7 @@ async function finish() {
       ? await api("card", { request: { event: r.event, task: r.task, question: r.question }, turns: r.turns })
       : { card: localCard(r.turns) };
     r.draft = out.card;
+    delete r.reviewValues;
     if (!out.card.title || out.card.title === "雨の日の提灯準備") r.draft.title = r.task + "の手引き";
     r.status = "draft";
     r.metrics.reviewStartedAt = Date.now();
@@ -1113,12 +1136,21 @@ function review() {
     `<section class="page-header">${stepper(3)}<h1>${draft ? "この内容で、伝わりますか？" : "次の準備で、また使える。"}</h1><p>${draft ? "元のお話を確かめながら、必要なら書き直してください。" : "質問から聞き取った内容を、出どころと一緒に残しました。"}</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)}／${esc(r.speaker)}</p><h2>${esc(c.title)}</h2>${draft ? "" : '<p class="verified">語り手と確認済み</p><br>'}<div class="facts">${FACTS.map(
       ([k, label]) => {
         const f = c.facts[k];
-        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}${f.sourceIds.length ? `<button class="source-btn" data-source="${k}">元のお話を確かめる</button>` : ""}</section>`;
+        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(r.reviewValues?.[k] ?? f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}${f.sourceIds.length ? `<button class="source-btn" data-source="${k}">元のお話を確かめる</button>` : ""}</section>`;
       },
     ).join(
       "",
     )}</div></article><div class="review-sidebar"><section class="side-card"><h3>${draft ? "確認して残す" : "この手引きを使う"}</h3>${draft ? `<p class="small">人名・時刻・条件を確認してください。修正した内容も、確認時の追記として残ります。</p><label class="check"><input type="checkbox" id="confirm">語り手と内容を確認しました。未確認の項目は、そのまま残します。</label><button class="primary-btn full" id="save-card">確認して残す</button>` : `<p class="small">${new Date(c.confirmedAt).toLocaleDateString("ja-JP")} に確認<br>${r.sampleData ? "架空データでの体験です。" : ""}</p><div class="settings-buttons"><button class="primary-btn" id="ask-memory">この記憶に聞く</button><button class="secondary-btn" id="print">印刷・PDFにする</button><button class="secondary-btn" id="measure">探しやすさを測る</button></div>`}</section><section class="side-card"><h3>次に聞きたいこと</h3>${unknown.length ? `<ul class="unknown-list">${unknown.map(([, l]) => `<li>${l}</li>`).join("")}</ul>` : '<p class="small">今回の6項目はお話が揃いました。実施前に変更がないか確かめましょう。</p>'}<button class="text-btn" id="resume">前回の続きから話を聞く</button></section></div></div>`,
   );
+  if (draft)
+    for (const [k] of FACTS) {
+      $("#fact-" + k).oninput = (e) => {
+        r.reviewValues ||= {};
+        r.reviewValues[k] = e.target.value;
+        localStorage.setItem(key, JSON.stringify(state));
+      };
+      $("#fact-" + k).onchange = save;
+    }
   document.querySelectorAll("[data-source]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -1137,27 +1169,21 @@ function review() {
   );
   $("#resume").onclick = beginInterview;
   $("#save-card")?.addEventListener("click", () => {
-    if (!$("#confirm").checked) return toast("語り手と内容を確認してから、チェックを入れてください。");
-    let corrections = 0;
-    for (const [k] of FACTS) {
-      const value = $("#fact-" + k).value.trim() || "未確認";
-      if (value !== c.facts[k].value) {
-        corrections++;
-        if (value === "未確認") c.facts[k] = { ...c.facts[k], value, sourceIds: [], status: "unknown" };
-        else {
-          const t = turn("user", `確認時の追記（${c.facts[k].label}）：${value}`);
-          r.turns.push(t);
-          c.facts[k] = { ...c.facts[k], value, sourceIds: [t.id], status: "stated" };
-        }
-      }
+    try {
+      const values = Object.fromEntries(FACTS.map(([k]) => [k, $("#fact-" + k).value]));
+      const reviewed = confirmDraft(r, c, values, $("#confirm").checked);
+      r.turns = reviewed.turns;
+      r.card = reviewed.card;
+      delete r.reviewValues;
+      r.status = "confirmed";
+      r.metrics.reviewSeconds = Math.round((Date.now() - r.metrics.reviewStartedAt) / 1000);
+      r.metrics.corrections = reviewed.corrections;
+      save();
+      render();
+      toast("確認した手引きを残しました。");
+    } catch (error) {
+      toast(error.message);
     }
-    r.card = reviewCard(r, { ...c, confirmed: true });
-    r.status = "confirmed";
-    r.metrics.reviewSeconds = Math.round((Date.now() - r.metrics.reviewStartedAt) / 1000);
-    r.metrics.corrections = corrections;
-    save();
-    render();
-    toast("確認した手引きを残しました。");
   });
   $("#ask-memory")?.addEventListener("click", () => go("knowledge"));
   $("#print")?.addEventListener("click", () => print());
@@ -1176,24 +1202,26 @@ function knowledge() {
     if (!q) return;
     const button = $("#memory-form button");
     button.disabled = true;
+    busy = true;
     try {
       const result = config.aiReady
         ? await api("answer", { question: q, card: r.card })
         : { keys: answerKeys(q, r.card) };
       const keys = result.keys || [];
       const log = $("#memory-log");
-      log.innerHTML += `<p class="memory-q">${esc(q)}</p>${keys.length ? keys.map((k) => `<section class="memory-a"><p class="fact-label">${esc(r.card.facts[k].label)}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p><blockquote class="small">${r.card.facts[k].sourceIds.map((id) => esc(r.turns.find((t) => t.id === id)?.text || "")).join("<br>")}</blockquote></section>`).join("") : `<p class="source-quote">そのことは、まだ記録されていません。次の聞き取りで確認しましょう。</p><button class="secondary-btn" id="queue-question">この質問を次の聞き取りへ</button>`}`;
+      const queueId = "queue-" + crypto.randomUUID();
+      log.insertAdjacentHTML("beforeend", `<p class="memory-q">${esc(q)}</p>${keys.length ? keys.map((k) => `<section class="memory-a"><p class="fact-label">${esc(r.card.facts[k].label)}</p><p class="fact-value">${esc(r.card.facts[k].value)}</p><blockquote class="small">${r.card.facts[k].sourceIds.map((id) => esc(r.turns.find((t) => t.id === id)?.text || "")).join("<br>")}</blockquote></section>`).join("") : `<p class="source-quote">そのことは、まだ記録されていません。次の聞き取りで確認しましょう。</p><button class="secondary-btn" id="${queueId}">この質問を次の聞き取りへ</button>`}`);
       $("#memory-question").value = "";
-      $("#queue-question")?.addEventListener("click", () => {
-        r.pendingQuestions ||= [];
-        r.pendingQuestions.push(q);
+      $("#" + queueId)?.addEventListener("click", () => {
+        queueQuestion(r, q);
         save();
-        toast("次の聞き取りで、この質問から始めます。");
-        $("#queue-question").disabled = true;
+        toast("次の聞き取りに質問を残しました。");
+        $("#" + queueId).disabled = true;
       });
     } catch (err) {
       toast(err.message);
     } finally {
+      busy = false;
       button.disabled = false;
     }
   };
@@ -1213,11 +1241,16 @@ function dictate(target) {
   toast("お話しください。音声認識はブラウザの機能を利用します。");
 }
 async function startLive() {
+  if (busy || liveAbort) return;
+  const controller = new AbortController();
+  liveAbort = controller;
+  const r = current();
   try {
     const { startConversation } = await import("./live.js");
-    const r = current();
+    if (controller.signal.aborted) return;
     $("#live").disabled = true;
     await startConversation({
+      signal: controller.signal,
       getToken: () => api("live-token", {}),
       request: r,
       onTurn: (role, text) => {
@@ -1242,11 +1275,16 @@ async function startLive() {
           n.append(b);
         }
       },
-      onEnd: () => render(),
+      onEnd: (error) => {
+        if (liveAbort === controller) liveAbort = null;
+        render();
+        if (error) toast(error);
+      },
     });
-  } catch (e) {
-    toast(e.message);
+  } catch (error) {
+    if (liveAbort === controller) liveAbort = null;
     render();
+    toast(error.message);
   }
 }
 const regionInfo = {

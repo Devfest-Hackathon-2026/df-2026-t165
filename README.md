@@ -27,7 +27,7 @@ npm start
 ## Google Cloudへ公開する人へ
 
 1. Google Cloudの **devfest165** を操作できる仲間のアカウントで [Cloud Shell](https://console.cloud.google.com/cloudshell/editor?project=devfest165) を開く。
-2. ZIPをアップロードし、展開したアプリのフォルダに移動。
+2. Cloud Shellで `git clone https://github.com/Kazuya43/tsugite.git` を実行し、`cd tsugite` で移動。非公開リポジトリなので、アクセスできるGitHubアカウントで認証してください。ZIPをアップロードして展開する方法でも構いません。
 3. 請求先が有効なことを確認。デプロイ・サービスアカウント作成／権限付与・API有効化ができる管理者が実行する。
 4. 下記を実行。Gemini APIキーとチーム用アクセスコードは、その場で非表示入力する。チャットに貼らない。
 
@@ -54,7 +54,15 @@ Cloud Runは最小0・最大1インスタンス、Liveは画面側で最大5分�
 
 ## 現在の検証範囲
 
-ローカルの7件のテストに合格。ブラウザで体験モードの質問→聞き取り→確認修正→保存・再読込、旅行希望→候補表示、出典表示を確認しました。Googleの実認証がないため、Geminiの実応答・Liveのマイク／音声・Firestore・Cloud Runは未検証です。Google用のスクリプトは構文確認のみで、実行していません。課題の解決効果や当事者テストの数値は未測定です。
+ローカルの19件のテストに合格。マイク接続の途中キャンセル・終了処理は、模擬した音声接続で確認しています。実機での音声応答とは区別します。ブラウザで体験モードの質問→聞き取り→確認修正→保存・再読込、旅行希望→候補表示、出典表示を確認しました。Googleの実認証がないため、Geminiの実応答・Liveのマイク／音声・Firestore・Cloud Runは未検証です。Google用のスクリプトは構文確認のみで、実行していません。課題の解決効果や当事者テストの数値は未測定です。
+
+## 接続確認とデモ準備
+
+- [Google公開後の接続チェック](docs/google-connection-check.md)
+- [3分のデモ構成とFB反映](docs/demo-and-feedback.md)
+- [安定化で修正した点と検証範囲](docs/stability-report.md)
+
+GitHub Actions用の設定例を `docs/check-workflow.yml` に置きました。現在のGitHub認証にworkflow権限がないため、自動実行はまだ有効にしていません。権限を持つ仲間が `.github/workflows/check.yml` として追加すると、プッシュ時にビルド・テスト・公開スクリプトの構文を確認できます。このCIはGoogleへの実接続を検証しません。
 
 ## 構成
 
