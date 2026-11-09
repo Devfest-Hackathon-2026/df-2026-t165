@@ -301,7 +301,7 @@ function questionFor(step) {
     return {
       q: a.purpose === "record" ? "どの町のお話を残しますか？" : "どの町の、祭りや行事ですか？",
       hint: "市町村名でも、地区や通りの名前でも大丈夫です。",
-      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button><button type="button" class="choice-sm" id="open-map">地図から選ぶ</button></div><div id="place-map" class="map-slot" hidden></div>`,
+      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button></div>`,
     };
   if (step === "how")
     return {
@@ -448,25 +448,6 @@ function welcome() {
       mapsKey: config.mapsKey,
       onPick: ({ region, pref }) => commit("area", candidateKey(region, pref), pref ? `${region.name}・${pref}` : region.name, pref || region.name),
     });
-  if ($("#open-map"))
-    $("#open-map").onclick = () => {
-      const slot = $("#place-map");
-      slot.hidden = !slot.hidden;
-      if (!slot.hidden && !slot.dataset.ready) {
-        slot.dataset.ready = "1";
-        mountMapPicker(slot, {
-          confirmLabel: "この地域で入力する",
-          mapsKey: config.mapsKey,
-          onPick: ({ region, pref }) => {
-            const f = $("#free");
-            f.value = (pref || region.name) + " ";
-            f.focus();
-            f.setSelectionRange(f.value.length, f.value.length);
-            toast(`「${pref || region.name}」を入れました。続けて市町村や地区の名前を入力してください。`);
-          },
-        });
-      }
-    };
   $("#back") &&
     ($("#back").onclick = () => {
       intake.history.pop();
