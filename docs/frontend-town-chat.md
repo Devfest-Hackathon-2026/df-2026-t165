@@ -2,6 +2,8 @@
 
 `integrate/front-main` ブランチで実装済みです。サーバーは `server.mjs`、Geminiに渡す前後の処理は `src/town.mjs`、資料の保存は `src/materials.mjs` にあります。
 
+![構成図](./images/architecture.jpg)
+
 | API | 役割 | Geminiなし（体験モード） |
 | --- | --- | --- |
 | `POST /api/town-answer` | 町の資料・登録資料・確認済みの語りを根拠に答える | 409 → 画面側の体験用回答 |
