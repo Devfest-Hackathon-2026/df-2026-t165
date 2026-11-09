@@ -14,7 +14,7 @@ import {
 import { townData } from "./town-data.js";
 import { tileArt } from "./tile-art.js";
 import { mountMapPicker, candidateKey } from "./japan-map.js";
-import { putFile, deleteFile, fileUrl, kindOf, MAX_BYTES, ACCEPT } from "./material-store.js";
+import { putFile, deleteFile, fileUrl, kindOf, MAX_BYTES, ACCEPT, uploadMaterial, listMaterials, removeMaterial, useServerHeaders } from "./material-store.js";
 const $ = (s) => document.querySelector(s),
   esc = (v) =>
     String(v ?? "").replace(
@@ -47,6 +47,9 @@ const headers = () => ({
   "x-workspace-id": wid,
   "x-demo-access-code": code,
 });
+useServerHeaders(headers);
+// サーバーがあるか（静的プレビューでは無い）。資料のファイルをサーバーに置くかどうかに使う
+const serverFiles = () => config.storage !== "browser";
 async function api(route, data) {
   const res = await fetch("/api/" + route, {
     signal: AbortSignal.timeout(50000),
@@ -513,6 +516,7 @@ function openPlace(name, question = "") {
   placeDraft = "";
   pendingAsk = question;
   go("place");
+  loadPlace(placeName);
 }
 // ---------- 資料（PDF・写真）を残す ----------
 let pendingFiles = [];
@@ -558,12 +562,12 @@ async function fillThumbs(root = document) {
   for (const img of root.querySelectorAll("[data-thumb]")) {
     const url = await fileUrl(img.dataset.thumb);
     if (url) img.src = url;
-    else img.replaceWith(Object.assign(document.createElement("span"), { className: "thumb thumb-missing", textContent: "この端末にありません" }));
+    else img.replaceWith(Object.assign(document.createElement("span"), { className: "thumb thumb-missing", textContent: "表示できません" }));
   }
 }
 async function openMaterial(id) {
   const url = await fileUrl(id);
-  if (!url) return toast("この資料のファイルは、この端末に保存されていません。");
+  if (!url) return toast("この資料のファイルを開けませんでした。登録した端末にしかない資料かもしれません。");
   window.open(url, "_blank", "noopener");
 }
 // カメラで撮る。スマホはOSのカメラ（capture入力）、パソコンはブラウザ内で撮影する。撮った写真は通常の登録と同じ流れに入る
@@ -625,11 +629,11 @@ function materialsPage() {
   const list = saved
     .map(
       (m) =>
-        `<li class="saved-item">${thumbHtml(m)}<div><strong>${esc(m.title)}</strong><small>${esc(m.kind)}${m.era ? "・" + esc(m.era) : ""}・${visLabel(m.visibility)}</small>${m.description ? `<p class="small">${esc(m.description)}</p>` : ""}<div class="saved-actions"><button class="text-btn" data-open="${m.id}">開く</button><button class="text-btn danger" data-remove="${m.id}">削除</button></div></div></li>`,
+        `<li class="saved-item">${thumbHtml(m)}<div><strong>${esc(m.title)}</strong><small>${esc(m.kind)}${m.era ? "・" + esc(m.era) : ""}・${visLabel(m.visibility)}${m.local ? "・この端末のみ" : ""}</small>${m.description ? `<p class="small">${esc(m.description)}</p>` : ""}<div class="saved-actions"><button class="text-btn" data-open="${m.id}">開く</button><button class="text-btn danger" data-remove="${m.id}">削除</button></div></div></li>`,
     )
     .join("");
   shell(
-    `<section class="page-header"><h1>${esc(place)}の資料を残す</h1><p>町史や文献のPDF、昔の写真を登録できます。登録した資料は、町のチャットで回答の根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDFや写真を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・JPEG・PNG・WebP、1ファイル20MBまで。</span></label><div class="capture-row"><button type="button" class="secondary-btn" id="take-photo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>カメラで撮る</button><input type="file" id="camera-input" accept="image/*" capture="environment" class="sr-only" tabindex="-1"><span class="small">古い写真や資料のページを、その場で撮って残せます。</span></div>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、写真の場所のことは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">登録した資料は、いまはこの端末のブラウザに保存されます（サーバーへの保存は準備中）。</p></div></div>`,
+    `<section class="page-header"><h1>${esc(place)}の資料を残す</h1><p>町史や文献のPDF、昔の写真を登録できます。登録した資料は、町のチャットで回答の根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDFや写真を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・JPEG・PNG・WebP、1ファイル20MBまで。</span></label><div class="capture-row"><button type="button" class="secondary-btn" id="take-photo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>カメラで撮る</button><input type="file" id="camera-input" accept="image/*" capture="environment" class="sr-only" tabindex="-1"><span class="small">古い写真や資料のページを、その場で撮って残せます。</span></div>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、写真の場所のことは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">${serverFiles() ? `登録した資料はサーバーに保存され、${esc(place)}のページを見る人が見られます${config.materialStorage === "cloud-storage" ? "" : "（いまはデモ用のサーバー内保存）"}。` : "登録した資料は、この端末のブラウザに保存されます。"}</p></div></div>`,
   );
   fillThumbs();
   const input = $("#file-input"),
@@ -657,26 +661,47 @@ function materialsPage() {
       e.preventDefault();
       if (!p.title.trim()) return toast("資料の名前を入れてください。");
       if (!p.consent) return toast("残してよいかの確認にチェックを入れてください。");
-      try {
-        await putFile(p.id, p.file);
-      } catch {
-        return toast("この端末に保存できませんでした。ブラウザの容量を確認してください。");
-      }
-      r.materials ||= [];
-      r.materials.push({
-        id: p.id,
-        kind: p.kind,
-        type: p.file.type,
-        name: p.file.name,
-        size: p.file.size,
+      const meta = {
+        place,
         title: p.title.trim().slice(0, 120),
         era: p.era.trim().slice(0, 60),
         source: p.source.trim().slice(0, 120),
         description: p.description.trim().slice(0, 1000),
         visibility: p.visibility,
+        consent: true,
         addedBy: r.speaker,
-        addedAt: new Date().toISOString(),
-      });
+      };
+      const btn = form.querySelector(".primary-btn");
+      btn.disabled = true;
+      btn.textContent = "登録しています…";
+      let rec = null;
+      if (serverFiles()) {
+        try {
+          rec = await uploadMaterial(p.file, meta);
+        } catch (err) {
+          // 入力の不備（形式・大きさ・確認）はそのまま伝える。通信の失敗などは、この端末への保存に切り替える
+          if ([400, 411, 413, 415].includes(err.status)) {
+            btn.disabled = false;
+            btn.textContent = "登録する";
+            return toast(err.message);
+          }
+        }
+      }
+      if (!rec) {
+        try {
+          await putFile(p.id, p.file);
+        } catch {
+          btn.disabled = false;
+          btn.textContent = "登録する";
+          return toast("保存できませんでした。通信やブラウザの容量を確認してください。");
+        }
+        const { consent, place: _p, ...rest } = meta;
+        rec = { id: p.id, kind: p.kind, type: p.file.type, name: p.file.name, size: p.file.size, ...rest, addedAt: new Date().toISOString(), local: true };
+        if (serverFiles()) toast("サーバーに送れなかったため、この端末に保存しました。");
+      }
+      r.materials ||= [];
+      r.materials.push(rec);
+      delete serverMats[place];
       if (p.preview) URL.revokeObjectURL(p.preview);
       pendingFiles = pendingFiles.filter((x) => x !== p);
       save();
@@ -699,10 +724,18 @@ function materialsPage() {
       (b.onclick = () => {
         const m = r.materials.find((x) => x.id === b.dataset.remove);
         modal(
-          `<h2>資料を削除しますか？</h2><p>「${esc(m.title)}」を削除します。この端末からファイルも消え、元に戻せません。</p><div class="dialog-actions"><button class="secondary-btn" data-close>やめる</button><button class="primary-btn" id="do-remove">削除する</button></div>`,
+          `<h2>資料を削除しますか？</h2><p>「${esc(m.title)}」を削除します。ファイルも消え、元に戻せません。</p><div class="dialog-actions"><button class="secondary-btn" data-close>やめる</button><button class="primary-btn" id="do-remove">削除する</button></div>`,
           () =>
             ($("#do-remove").onclick = async () => {
+              if (m.server) {
+                try {
+                  await removeMaterial(m.id);
+                } catch (err) {
+                  if (err.status !== 404) return toast(err.message);
+                }
+              }
               r.materials = r.materials.filter((x) => x !== m);
+              delete serverMats[place];
               try {
                 await deleteFile(m.id);
               } catch {}
@@ -739,8 +772,23 @@ function placeRequests() {
     return n && (e.includes(n) || n.includes(e.replace(/の.*$/, "")));
   });
 }
+// サーバーにある町の資料（みんなが登録したもの）と、町の情報。町のページを開くたびに読み直す
+let serverMats = {},
+  serverTowns = {};
+async function loadPlace(name) {
+  if (!serverFiles() || !name) return;
+  try {
+    const out = await api("town?place=" + encodeURIComponent(name));
+    serverMats[name] = out.materials || [];
+    if (out.town) serverTowns[name] = out.town;
+    if (page === "place" && placeName === name) placePage();
+  } catch {}
+}
+const townFor = (name) => townData(name) || serverTowns[name] || null;
 function placeMaterials() {
-  return placeRequests().flatMap((r) => (r.materials || []).map((m) => ({ ...m, requestId: r.id })));
+  const local = placeRequests().flatMap((r) => (r.materials || []).map((m) => ({ ...m, requestId: r.id })));
+  const ids = new Set(local.map((m) => m.id));
+  return [...local, ...(serverMats[placeName] || []).filter((m) => !ids.has(m.id))];
 }
 // 日本語の質問と資料の説明を、漢字・カタカナを含む2文字の重なりで照らし合わせる
 const bigrams = (t) => {
@@ -777,7 +825,7 @@ const materialSource = (m) => ({
 });
 // 体験用の回答。登録された資料と、語り手が確認した手引きだけを根拠にする
 function localTownAnswer(question) {
-  const town = townData(placeName),
+  const town = townFor(placeName),
     cited = [],
     cite = (src) => {
       let i = cited.findIndex((c) => c.id === src.id);
@@ -787,7 +835,7 @@ function localTownAnswer(question) {
     parts = [],
     materials = new Set();
   if (town) {
-    for (const k of town.knowledge.filter((k) => k.words.test(question)).slice(0, 2)) {
+    for (const k of (town.knowledge || []).filter((k) => k.words.test(question)).slice(0, 2)) {
       parts.push(k.text.replace(/\[(\w+)\]/g, (_, id) => cite(town.sources.find((s) => s.id === id))));
       k.materials.forEach((m) => materials.add(m));
     }
@@ -845,7 +893,19 @@ async function askTown(question) {
   if (config.aiReady) {
     try {
       // バックエンドの受け口（docs/frontend-town-chat.md）。未実装なら体験用の回答に切り替える
-      reply = await api("town-answer", { place: placeName, question, history: log.slice(-10) });
+      const stories = placeRequests()
+        .filter((r) => r.card?.confirmedAt)
+        .map((r) => ({
+          requestId: r.id,
+          speaker: r.speaker,
+          title: r.card.title,
+          confirmedAt: r.card.confirmedAt,
+          facts: FACTS.map(([k]) => r.card.facts[k])
+            .filter((f) => f?.status === "stated")
+            .map((f) => ({ label: f.label, value: f.value })),
+        }));
+      const history = log.slice(-11, -1).map((m) => ({ role: m.role, text: m.text }));
+      reply = await api("town-answer", { place: placeName, question, history, stories });
     } catch {}
   }
   if (!reply) {
@@ -892,7 +952,7 @@ function contactsHtml(town) {
 }
 function placePage() {
   if (!placeName) return go("hub");
-  const town = townData(placeName),
+  const town = townFor(placeName),
     region = Object.values(regionInfo).find((r) => r.name === placeName),
     log = townChats[placeName] || [],
     stories = placeRequests().filter((r) => r.card),
@@ -1330,16 +1390,43 @@ function matchRegions() {
     })
     .sort((a, b) => b.score - a.score);
 }
+// AIが候補を並べ直した結果。答えが変わったら取り直す（失敗したら簡単な振り分けのまま）
+let aiRegions = { sig: "", data: null };
+function askAiRegions(sig, answers) {
+  aiRegions = { sig, data: null };
+  const candidates = Object.entries(regionInfo).map(([id, r]) => ({ id, name: r.name, hint: r.hint, topic: r.topic, position: r.position }));
+  api("regions", { candidates, answers })
+    .then((out) => {
+      if (aiRegions.sig !== sig) return;
+      aiRegions.data = out.regions;
+      if (page === "regions") regions();
+    })
+    .catch(() => {
+      if (aiRegions.sig === sig) aiRegions.data = [];
+      if (page === "regions") regions();
+    });
+}
 function regions() {
-  const list = matchRegions(),
-    fits = list.filter((x) => x.score > 0),
-    shown = fits.length ? fits : list.filter((x) => x.score >= 0),
-    answered = [
-      answerLabel("env", hearing.env),
-      ...hearing.values.map((v) => answerLabel("values", v)),
-      hearing.area ? answerLabel("area", hearing.area) : "",
-      ...(hearing.texts || []),
-    ].filter(Boolean);
+  const answered = [
+    answerLabel("env", hearing.env),
+    ...hearing.values.map((v) => answerLabel("values", v)),
+    hearing.area ? answerLabel("area", hearing.area) : "",
+    ...(hearing.texts || []),
+  ].filter(Boolean);
+  let list = matchRegions();
+  const sig = JSON.stringify(hearing);
+  if (config.aiReady && aiRegions.sig !== sig) askAiRegions(sig, [...answered, hearing.note].filter(Boolean));
+  const ai = config.aiReady && aiRegions.sig === sig ? aiRegions.data : null,
+    aiWaiting = config.aiReady && aiRegions.sig === sig && !ai,
+    aiUsed = Boolean(ai?.length);
+  if (aiUsed) {
+    const local = Object.fromEntries(list.map((x) => [x.k, x]));
+    list = ai
+      .filter((a) => local[a.id])
+      .map((a) => ({ ...local[a.id], reasons: a.reasons.length ? a.reasons : local[a.id].reasons, score: a.fit && local[a.id].score >= 0 ? 1 : local[a.id].score < 0 ? -1 : 0 }));
+  }
+  const fits = list.filter((x) => x.score > 0),
+    shown = fits.length ? fits : list.filter((x) => x.score >= 0);
   shell(
     `<section class="hero hero-small"><h1>合いそうな地域の候補</h1><p class="lead">${answered.length ? `「${answered.map(esc).join("」「")}」をもとに選びました。` : "お答えをもとに選びました。"}${fits.length ? "" : "ぴったり合う候補がなかったため、登録済みの地域をすべて表示しています。"}</p><button class="text-btn" data-page="welcome" id="redo">答えを変える</button></section><form class="refine" id="refine-form"><label class="label" for="refine">条件を書き足して、探し直す</label><div class="free"><input class="field" id="refine" autocomplete="off" maxlength="300" placeholder="例：港町で、漁の祭りが残っているところ" required><button class="secondary-btn">探し直す</button></div></form>${hearing.area === "other" ? '<p class="notice">「そのほか」の方面は、まだ地域の記録がありません。取材が進んだら候補に加わります。</p>' : ""}<div class="region-grid">${shown
       .map(
@@ -1348,7 +1435,7 @@ function regions() {
       )
       .join(
         "",
-      )}</div><p class="small region-note">候補は体験用の簡単な振り分けです。写真は実在の特定の町や語り手を紹介するものではありません。</p>`,
+      )}</div><p class="small region-note">${aiUsed ? "候補は、登録済みの地域の中からAIがお答えをもとに並べました。" : aiWaiting ? "AIが候補を見直しています…" : "候補は体験用の簡単な振り分けです。"}写真は実在の特定の町や語り手を紹介するものではありません。</p>`,
   );
   $("#redo").onclick = () => go("welcome");
   $("#refine-form").onsubmit = (e) => {

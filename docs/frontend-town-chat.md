@@ -1,101 +1,126 @@
-# 町のチャット：フロントとバックエンドの受け口
+# 町のチャット・資料・地域候補のAPI
 
-フロント（`dev/front`）の町のチャットは、AI接続設定があるとき（`/api/config` の `aiReady: true`）に次の受け口を呼びます。受け口がない・失敗したときは、画面側の体験用データ（`public/town-data.js`）で答えます。
+`integrate/front-main` ブランチで実装済みです。サーバーは `server.mjs`、Geminiに渡す前後の処理は `src/town.mjs`、資料の保存は `src/materials.mjs` にあります。
+
+| API | 役割 | Geminiなし（体験モード） |
+| --- | --- | --- |
+| `POST /api/town-answer` | 町の資料・登録資料・確認済みの語りを根拠に答える | 409 → 画面側の体験用回答 |
+| `POST /api/materials` | 写真・PDFを登録する | 動く（サーバーに保存） |
+| `GET /api/materials?place=` | 町の資料一覧 | 動く |
+| `GET /api/materials/:id/file` | 資料のファイル本体 | 動く |
+| `DELETE /api/materials/:id` | 資料を削除（登録した作業領域だけ） | 動く |
+| `GET /api/town?place=` | 町の情報（資料・連絡先・質問例）と資料一覧 | 動く |
+| `POST /api/regions` | 登録済みの地域の候補を、答えに合う順に並べる | 409 → 画面側の振り分け |
+
+ヘッダーは既存のAPIと同じです（`x-workspace-id`、`x-demo-access-code`）。Geminiを使う2つは、既存のAI利用上限（作業領域ごとに1時間30回）に数えます。資料の登録は1時間40件までです。
 
 ## POST `/api/town-answer`
 
-ヘッダーは既存のAPIと同じです（`x-workspace-id`、`x-demo-access-code`）。
-
-### リクエスト
+リクエスト：
 
 ```json
 {
   "place": "青葉地区",
   "question": "夏祭りはいつから続いているの？",
-  "history": [
-    { "role": "user", "text": "…" },
-    { "role": "assistant", "text": "…", "citations": [] }
+  "history": [{ "role": "user", "text": "…" }, { "role": "assistant", "text": "…" }],
+  "stories": [
+    {
+      "requestId": "…",
+      "speaker": "田中さん",
+      "title": "雨の日の提灯準備",
+      "confirmedAt": "ISO日時",
+      "facts": [{ "label": "雨天の場所", "value": "公民館の集会室" }]
+    }
   ]
 }
 ```
 
-`history` は直近10件まで。
+- `history` は直近10件。`stories` は、その端末で語り手が確認した手引き（未確認の項目は送らない・使わない）。
+- サーバーは次を根拠として番号 S1, S2… を振り、Geminiに渡します。
+  1. 町の資料（今は架空の青葉地区だけ。`public/town-data.js`）
+  2. その町に登録された資料の説明（最大30件）。写真・PDFのうち、1件10MB以下・合計18MB以下の最大4件は、**ファイルの中身もGeminiに添付**します
+  3. 確認済みの語り
+- Geminiには「根拠にないことは書かない・推測しない・文末に [S1] を付ける・答えられなければ askable」を指示し、JSONで返させます。
+- サーバーは返事を検証し、`[S3]` を画面用の `[1]` `[2]` に振り直します。根拠にない番号は消し、根拠が1つもなければ `askable: true` にします。
 
-### レスポンス
+レスポンス：
 
 ```json
 {
-  "text": "夏祭りは昭和25年に青年団が始めたと記録されています[1]。神輿は昭和30年に新しくされました[2]。",
+  "text": "夏祭りは昭和25年に青年団が始めたと記録されています[1]。",
   "citations": [
-    {
-      "id": "ayumi",
-      "title": "『青葉地区のあゆみ』",
-      "author": "青葉地区自治会 編",
-      "year": "1998年",
-      "kind": "郷土誌",
-      "excerpt": "根拠になった箇所の抜粋",
-      "where": "青葉地区公民館 2階 郷土資料室で閲覧できます",
-      "url": "https://…（任意）",
-      "requestId": "語り手の手引きが根拠のとき、そのrequestのid（任意）"
-    }
+    { "id": "ayumi", "title": "『青葉地区のあゆみ』", "author": "…", "year": "1998年", "kind": "郷土誌", "excerpt": "…", "where": "…" }
   ],
-  "materials": [
-    { "id": "dayori", "title": "青葉公民館だより 第212号", "kind": "広報紙", "where": "公民館の窓口で見られます" }
-  ],
+  "materials": [],
   "askable": false,
   "mode": "gemini"
 }
 ```
 
-- `text` 中の `[1]` `[2]` は `citations` の1始まりの番号です。画面では押せる番号になり、押すと抜粋を表示します。
-- `citations` には回答の根拠にした資料だけを入れます。根拠がない文は書かない前提です。
-- `materials` は「こんな資料があります」として出す、読める資料の案内です。
-- `askable: true` のとき、回答の下に「この質問を地域の人に聞く」を出します。資料で答えられないときに `true` にしてください。押すと既存の聞き取りの流れ（`request`）に質問が入ります。
-- `mode` が `"experience"` のときだけ「体験用の回答」と表示します。
+登録資料が根拠のときは、`citations` に `fileId`・`fileKind`（`写真`／`PDF資料`）・`server: true` が入り、画面は写真なら画像、PDFなら「PDFを開く」を出します。語りが根拠のときは `requestId` が入ります。
 
-## 連絡先
+## 資料（写真・PDF）
 
-連絡先は今は `public/town-data.js` の `contacts` です（青葉地区は架空、電話番号も架空）。実在の町を扱うときは、町ごとの連絡先をバックエンドから返す形にするのがよさそうです（例：`GET /api/town/:place` → `{ contacts, sources, suggestions }`）。登録がない町では、画面は図書館・公民館・役所を地図で探すリンクを出します。
+### POST `/api/materials`
 
-## 統合時に見てほしいこと
-
-- 手引きの6項目（`src/domain.mjs` の `FACTS`）が提灯準備用に固定されているため、町の歴史の聞き取りでも「雨天の場所」などが出ます。
-- 町のチャットの履歴はブラウザ（`localStorage` の `tsugite-town-chats-v1`）だけに保存しています。サーバー保存の `state` には入れていません。
-
-## 資料（PDF・写真）の受け口
-
-「町の記録を残す」→「資料を登録する」で、PDF（文献・町史）と写真（JPEG・PNG・WebP、1ファイル20MBまで）を登録できます。
-
-いまの保存先：
-- ファイル本体：ブラウザのIndexedDB（`tsugite-materials`）。この端末にしかありません。
-- 説明：`request.materials` に入り、既存の `PUT /api/workspace/:id` に乗ります。
+`multipart/form-data` で `file` と `meta`（JSON文字列）を送ります。
 
 ```json
 {
-  "id": "uuid",
-  "kind": "写真 | PDF資料",
-  "type": "image/jpeg",
-  "name": "ekimae.jpg",
-  "size": 115000,
+  "place": "青葉地区",
   "title": "駅前の商店街",
   "era": "昭和40年ごろ",
   "source": "祖父のアルバム",
-  "description": "駅が開業して数年後の商店街。左手の八百屋は今の青葉ストアの場所。",
+  "description": "駅が開業して数年後の商店街。",
   "visibility": "town | keepers | public",
-  "addedBy": "田中さん",
-  "addedAt": "ISO日時"
+  "consent": true,
+  "addedBy": "田中さん"
 }
 ```
 
-登録時に「残してよいか確認しました」のチェックを必須にしています。
+- PDF・JPEG・PNG・WebP、1ファイル20MBまで。形式は**ファイルの先頭のバイトで確認**します（拡張子の偽装は弾く）。
+- `consent: true`（残してよいか確認した）がないと登録できません。
+- 町の名前は空白を除いてそろえます（「青葉 地区」と「青葉地区」は同じ町）。
+- 返事は `201 { material }`。`material` には登録した作業領域のIDを含めず、`mine`（自分が登録したか）だけを返します。
 
-バックエンドで用意してほしいもの（案）：
-- `POST /api/materials`（multipart：`file` と上の説明）→ Cloud Storageにファイル、Firestoreに説明を保存し、`{ id, url }` を返す。
-- `GET /api/materials?place=青葉地区` → 町の資料の一覧（見られる人の範囲で絞る）。
-- `/api/town-answer` の根拠に資料を使うときは、`citations` に `fileId`（または `url`）と `fileKind`（`写真`／`PDF資料`）を入れてください。画面は写真なら画像、PDFなら「PDFを開く」を出します。
-- PDFの中身を回答に使うには、本文の抽出（例：GeminiにPDFを渡して要約・索引化）が必要です。いまの体験モードは、登録時に書いてもらった名前・年代・説明だけで照合しています。
+### 保存先
 
-## 地図とカメラ（フロントのみで完結）
+| | 説明（メタデータ） | ファイル本体 |
+| --- | --- | --- |
+| Cloud Run（本番） | Firestore `tsugite_materials` | Cloud Storage `TSUGITE_BUCKET` の `materials/<id>` |
+| 手元・テスト | `TSUGITE_DATA_DIR/materials/index.json` | `TSUGITE_DATA_DIR/materials/files/<id>` |
 
-- 地図：Leaflet 1.9.4（`public/lib/leaflet/`、BSD-2ライセンス）に地理院タイル（淡色地図）を表示。地方→都道府県の順に絞り込む。座標と地方の区分は `public/japan-map.js`。市町村まで地図で選ぶには市町村の境界か一覧のデータが必要（今は都道府県まで選んで、市町村名は入力してもらう形）。
-- カメラ：資料の登録画面の「カメラで撮る」。パソコンはブラウザ内で撮影（getUserMedia）、スマホは端末のカメラを起動（`capture` 付きのファイル入力）。撮った写真は通常の資料と同じ流れで登録される。HTTPS（Cloud Run）か localhost でのみ動作。サーバー側の変更は不要（今のサーバーはカメラを止めるヘッダーを返していない）。
+- `scripts/deploy-google.sh` が、非公開のバケット（既定名 `<プロジェクト>-tsugite-materials`）を作り、実行用サービスアカウントに読み書き権限を付け、`TSUGITE_BUCKET` を設定します。
+- バケットを設定しないと、ファイルはサーバー内に保存されます。Cloud Runでは再起動で消えるので、本番では必ず設定してください。
+- `/api/config` の `materialStorage`（`cloud-storage`／`local-file`）で、今の保存先が分かります。
+
+### 画面の動き
+
+- 登録すると、まずサーバーに送ります。通信の失敗や静的プレビューのときは、その端末のブラウザ（IndexedDB）に保存し、一覧に「この端末のみ」と出します。
+- 町のページを開くたびに `GET /api/town` で資料一覧を読み直すので、**別の人が登録した資料も見えます**。体験モードの回答でも根拠に使います。
+- ファイルは、端末にあればそこから、なければ `GET /api/materials/:id/file` から取って表示します。
+
+## POST `/api/regions`
+
+```json
+{
+  "candidates": [{ "id": "setouchi", "name": "瀬戸内の海辺", "hint": "…", "topic": "…", "position": "…" }],
+  "answers": ["海の近く", "祭りや行事", "中国"]
+}
+```
+
+返事は `{ "regions": [{ "id": "setouchi", "fit": true, "reasons": ["海が見える"] }] }`。**候補にない地域は作らせません**（サーバーで除外）。画面は、方面の答えで外れる地域を、AIが合うと言っても出しません。候補を待つ間は、今までの振り分けを表示します。
+
+## 環境変数（追加分）
+
+| 変数 | 内容 |
+| --- | --- |
+| `TSUGITE_BUCKET` | 資料ファイルを置くCloud Storageのバケット名 |
+| `GEMINI_BASE_URL` | GeminiのAPIの接続先を変えるとき（テストで偽のGeminiを使う） |
+
+## 残っていること
+
+- 町の資料（郷土誌など）と連絡先は、架空の青葉地区のぶんだけです。実在の町を扱うなら、町ごとのデータの置き場（Firestoreなど）と登録手段が必要です。
+- 確認済みの語りは、その端末の記録から送っています。ほかの人が確認した語りを町のチャットの根拠にするには、確認した手引きを町ごとにサーバーへ集める仕組みが必要です。
+- 「見られる人」（町の人だけ／担い手だけ／だれでも）は保存していますが、まだ見る人で絞り込んでいません（ログインがないため）。
+- 地域の候補は、登録済みの3地域から選ぶ形です。

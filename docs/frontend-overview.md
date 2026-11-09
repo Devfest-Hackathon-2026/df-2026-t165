@@ -92,7 +92,7 @@ flowchart LR
 
 - 資料：PDF・JPEG・PNG・WebP（1ファイル20MBまで）。名前・年代・出どころ・説明・見られる人を入れ、「残してよいか確認しました」のチェックが必須
 - カメラ：パソコンはブラウザ内で撮影、スマホは端末のカメラが起動。撮った写真は資料と同じ流れで登録。https（Cloud Run）かlocalhostでのみ動作
-- **ファイルは今その端末のブラウザの中だけに保存**されます（チームで共有するにはバックエンドが必要）
+- 登録した資料はサーバーに保存され、町のページを見るほかの人にも見えます（`integrate/front-main`）。送れないときだけ端末のブラウザに保存します
 
 | 話して残す（聞き取り） | 確かめて残す |
 | --- | --- |
@@ -123,6 +123,8 @@ flowchart LR
 
 ### 新しく必要なAPI
 
+**`integrate/front-main` ブランチで5つとも実装済みです**（`main` の取り込みも済み）。入出力・保存先・残りの課題は [frontend-town-chat.md](./frontend-town-chat.md) を見てください。
+
 | API | 優先 | 画面 | 役割 |
 | --- | --- | --- | --- |
 | `POST /api/town-answer` | 必須 | 町のチャット | 資料と語りを根拠にGeminiが答える。根拠の番号つき |
@@ -138,8 +140,8 @@ flowchart LR
 | データ | 今 | 統合後（案） |
 | --- | --- | --- |
 | 相談・聞き取りの記録（`state.requests`） | ブラウザ＋`PUT /api/workspace` | そのまま |
-| 資料の説明（`request.materials`） | `state` に含めてサーバーへ | Firestore |
-| 資料のファイル本体 | ブラウザ（IndexedDB）のみ | Cloud Storage |
+| 資料の説明（`request.materials`） | `/api/materials` で町ごとに保存 | Firestore（実装済み） |
+| 資料のファイル本体 | サーバー（本番はCloud Storage）。送れないときだけブラウザ | Cloud Storage（実装済み） |
 | 町のチャット履歴 | ブラウザ（localStorage）のみ | 必要ならFirestore |
 | 町の資料・連絡先 | `public/town-data.js`（架空の青葉地区のみ） | `GET /api/town` |
 
