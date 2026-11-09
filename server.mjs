@@ -12,6 +12,8 @@ import {Readable} from 'node:stream';
 import {Storage} from '@google-cloud/storage';
 import {createMaterialStore,materialRecord,publicRecord,sniff,MAX_BYTES} from './src/materials.mjs';
 import {townData,buildSources,cleanStories,cleanHistory,TOWN_SYSTEM,townPrompt,parseTownAnswer,REGIONS_SYSTEM,cleanRegionRequest,regionsPrompt,parseRegions} from './src/town.mjs';
+// 音声(Live)は global では使えないモデルがあるため、場所を分ける（既定 us-central1）
+const liveAi=vertex&&project?new GoogleGenAI({vertexai:true,project,location:process.env.GEMINI_LIVE_LOCATION||'us-central1',httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null;
 const liveTickets=new Map();const LIVE_MODEL=process.env.GEMINI_LIVE_MODEL||'gemini-3.8-live';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));const PORT=Number(process.env.PORT||4321);
 const project=process.env.GOOGLE_CLOUD_PROJECT||process.env.GCLOUD_PROJECT;
@@ -86,7 +88,7 @@ export const server=http.createServer(async(req,res)=>{try{const url=new URL(req
 // ブラウザにキーや認証情報は渡さない。接続の許可は /api/live-token が出す1回限りのチケットで確かめる。
 const wss=new WebSocketServer({noServer:true,maxPayload:512*1024});
 server.on('upgrade',(req,socket,head)=>{let p='';try{p=new URL(req.url,'http://localhost').pathname}catch{}
- if(p!=='/api/live-ws'||!ai||!vertex){socket.destroy();return}
+ if(p!=='/api/live-ws'||!liveAi){socket.destroy();return}
  wss.handleUpgrade(req,socket,head,ws=>liveProxy(ws));
 });
 const clip=(v,n)=>String(v??'').slice(0,n);
@@ -106,7 +108,7 @@ function liveProxy(ws){
    const r=m.request||{};let card=null;try{const j=JSON.stringify(r.card||null);if(j.length<6000)card=JSON.parse(j)}catch{}
    const request={currentQuestion:clip(r.currentQuestion,500),question:clip(r.currentQuestion,500),card,turns:(Array.isArray(r.turns)?r.turns:[]).slice(-12).map(x=>({role:x?.role==='user'?'user':'assistant',text:clip(x?.text,1200)}))};
    try{
-    session=await ai.live.connect({model:LIVE_MODEL,config:{responseModalities:[Modality.AUDIO],inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:liveInstruction(request)}]}},callbacks:{
+    session=await liveAi.live.connect({model:LIVE_MODEL,config:{responseModalities:[Modality.AUDIO],inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:liveInstruction(request)}]}},callbacks:{
      onmessage:msg=>out({type:'message',message:msg}),
      onerror:e=>{console.error('[live-error]',e?.message?clip(e.message,300):'');out({type:'error',message:'音声接続でエラーが発生しました。'});end()},
      onclose:()=>end()
