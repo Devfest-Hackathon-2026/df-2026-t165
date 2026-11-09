@@ -504,7 +504,7 @@ function addFiles(list) {
   for (const file of list) {
     const kind = kindOf(file.type);
     if (!kind) {
-      toast(`「${file.name}」は登録できない形式です。PDF、JPEG、PNG、WebPを選んでください。`);
+      toast(`「${file.name}」は登録できない形式です。PDF、写真（JPEG・PNG・WebP）、動画（MP4・MOV・WebM）を選んでください。`);
       continue;
     }
     if (file.size > MAX_BYTES) {
@@ -529,7 +529,7 @@ function addFiles(list) {
 function thumbHtml(m, preview = "") {
   return m.kind === "写真"
     ? `<img class="thumb" ${preview ? `src="${preview}"` : `data-thumb="${m.id}"`} alt="">`
-    : `<span class="thumb thumb-pdf" aria-hidden="true">PDF</span>`;
+    : `<span class="thumb thumb-pdf" aria-hidden="true">${m.kind === "動画" ? "動画" : "PDF"}</span>`;
 }
 async function fillThumbs(root = document) {
   for (const img of root.querySelectorAll("[data-thumb]")) {
@@ -606,7 +606,7 @@ function materialsPage() {
     )
     .join("");
   shell(
-    `<section class="page-header"><h1>${esc(place)}の祭り・行事の資料を残す</h1><p>行事の記録や当番表、昔の祭りの写真・PDFを登録できます。登録した資料は、町のチャットで、段取りの答えの根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDFや写真を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・JPEG・PNG・WebP、1ファイル20MBまで。</span></label><div class="capture-row"><button type="button" class="secondary-btn" id="take-photo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>カメラで撮る</button><input type="file" id="camera-input" accept="image/*" capture="environment" class="sr-only" tabindex="-1"><span class="small">古い写真や資料のページを、その場で撮って残せます。</span></div>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、行事の段取りは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">${serverFiles() ? `登録した資料はサーバーに保存され、${esc(place)}のページを見る人が見られます${config.materialStorage === "cloud-storage" ? "" : "（いまはデモ用のサーバー内保存）"}。` : "登録した資料は、この端末のブラウザに保存されます。"}</p></div></div>`,
+    `<section class="page-header"><h1>${esc(place)}の祭り・行事の資料を残す</h1><p>行事の記録や当番表、昔の祭りの写真・PDFを登録できます。登録した資料は、町のチャットで、段取りの答えの根拠として示されます。</p></section><div class="review-layout"><section class="paper-card upload-card"><label class="dropzone" for="file-input"><input type="file" id="file-input" accept="${ACCEPT}" multiple class="sr-only"><span class="dropzone-title">PDF・写真・動画を選ぶ</span><span class="small">ここにドラッグしても追加できます。PDF・写真・動画（MP4・MOV・WebM）、1ファイル20MBまで。動画は、タイトルと説明が回答の根拠になります（動画の中身は読み取りません）。</span></label><div class="capture-row"><button type="button" class="secondary-btn" id="take-photo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>カメラで撮る</button><input type="file" id="camera-input" accept="image/*" capture="environment" class="sr-only" tabindex="-1"><span class="small">古い写真や資料のページを、その場で撮って残せます。</span></div>${pending ? `<div class="upload-list">${pending}</div>` : ""}</section><div class="review-sidebar"><section class="side-card"><h3>登録した資料<span class="count">${saved.length}</span></h3>${list ? `<ul class="saved-list">${list}</ul>` : '<p class="small">まだありません。</p>'}</section><section class="side-card"><h3>ほかの残し方</h3><p class="small">資料にまつわる思い出や、行事の段取りは、話して残すこともできます。</p><button class="secondary-btn" id="to-talk">話して残す</button><button class="text-btn" id="to-town">${esc(place)}のページを見る</button></section><p class="small upload-note">${serverFiles() ? `登録した資料はサーバーに保存され、${esc(place)}のページを見る人が見られます${config.materialStorage === "cloud-storage" ? "" : "（いまはデモ用のサーバー内保存）"}。` : "登録した資料は、この端末のブラウザに保存されます。"}</p></div></div>`,
   );
   fillThumbs();
   const input = $("#file-input"),

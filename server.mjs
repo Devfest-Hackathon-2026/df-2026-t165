@@ -47,7 +47,7 @@ async function materialsRoute(req,res,url){
   const file=form.get('file');if(!file||typeof file==='string')return json(res,400,{error:'ファイルがありません'});
   let meta;try{meta=JSON.parse(String(form.get('meta')||'{}'))}catch{return json(res,400,{error:'資料の説明を確認してください'})}
   const bytes=Buffer.from(await file.arrayBuffer()),type=sniff(bytes);
-  if(!type)return json(res,415,{error:'PDF、JPEG、PNG、WebPのファイルを選んでください'});
+  if(!type)return json(res,415,{error:'PDF、写真（JPEG・PNG・WebP）、動画（MP4・MOV・WebM）のファイルを選んでください'});
   const record=materialRecord(meta,{name:file.name,type,size:bytes.length},who);
   await materials.put(record,bytes);return json(res,201,{material:publicRecord(record,who)})}
  const record=parts.length>=3?await materials.get(parts[2]):null;if(!record)return json(res,404,{error:'資料が見つかりません'});

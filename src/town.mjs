@@ -14,10 +14,10 @@ export function buildSources({place,materials=[],stories=[]}){
  for(const s of town?.sources||[])add({id:s.id,title:s.title,author:s.author,year:s.year,kind:s.kind,excerpt:s.excerpt,where:s.where},`${s.title}（${s.kind}・${s.year}・${s.author}）：${s.excerpt}`);
  let budget=FILE_LIMITS.total,files=0;
  for(const m of materials.slice(0,30)){
-  const attach=files<FILE_LIMITS.count&&m.size<=FILE_LIMITS.each&&m.size<=budget;
+  const attach=m.kind!=='動画'&&files<FILE_LIMITS.count&&m.size<=FILE_LIMITS.each&&m.size<=budget;
   if(attach){files++;budget-=m.size}
   add({id:'mat-'+m.id,title:`「${m.title}」`,author:m.source||`${m.addedBy||'住民'}が登録`,year:m.era||'年代不明',kind:`${m.kind}（住民が登録）`,excerpt:m.description||'説明は登録されていません',where:'住民の方がツギキキに登録した資料です',fileId:m.id,fileKind:m.kind,server:true},
-   `住民が登録した${m.kind}「${m.title}」（年代：${m.era||'不明'}／出どころ：${m.source||'不明'}）。登録者の説明：${m.description||'なし'}${attach?'（ファイルの中身を添付）':''}`,attach?m:null);
+   `住民が登録した${m.kind}「${m.title}」（年代：${m.era||'不明'}／出どころ：${m.source||'不明'}）。登録者の説明：${m.description||'なし'}${m.kind==='動画'?'（動画の中身は確認していない。タイトルと説明に書かれたことだけが根拠）':''}${attach?'（ファイルの中身を添付）':''}`,attach?m:null);
  }
  for(const s of stories)add({id:'card-'+s.requestId,title:`${s.speaker}の語り「${s.title}」`,author:s.speaker,year:s.confirmedAt?new Date(s.confirmedAt).toLocaleDateString('ja-JP'):'',kind:'聞き取り（語り手が確認済み）',excerpt:s.facts.map(f=>`${f.label}：${f.value}`).join('\n'),requestId:s.requestId},
   `${s.speaker}が確認した語り「${s.title}」：${s.facts.map(f=>`${f.label}は${f.value}`).join('／')}`);

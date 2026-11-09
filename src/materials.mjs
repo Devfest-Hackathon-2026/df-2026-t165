@@ -5,7 +5,7 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 
 export const MAX_BYTES=20*1024*1024;
-export const TYPES={'application/pdf':'PDF資料','image/jpeg':'写真','image/png':'写真','image/webp':'写真'};
+export const TYPES={'application/pdf':'PDF資料','image/jpeg':'写真','image/png':'写真','image/webp':'写真','video/mp4':'動画','video/quicktime':'動画','video/webm':'動画'};
 const VISIBILITY=['town','keepers','public'];
 export const placeKey=p=>String(p||'').normalize('NFKC').replace(/\s/g,'').slice(0,80);
 const str=(v,n)=>String(v??'').trim().slice(0,n);
@@ -17,6 +17,8 @@ export function sniff(bytes){
  if(b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)return 'image/jpeg';
  if(b[0]===0x89&&ascii(1,4)==='PNG')return 'image/png';
  if(ascii(0,4)==='RIFF'&&ascii(8,12)==='WEBP')return 'image/webp';
+ if(ascii(4,8)==='ftyp')return ascii(8,12)==='qt  '?'video/quicktime':'video/mp4';
+ if(b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3)return 'video/webm';
  return null;
 }
 
@@ -27,7 +29,7 @@ export function materialRecord(meta,{name,type,size},owner){
  if(!placeKey(place))throw Error('町の名前を入れてください');
  if(!title)throw Error('資料の名前を入れてください');
  if(meta.consent!==true)throw Error('残してよいかの確認が必要です');
- if(!TYPES[type])throw Error('PDF、JPEG、PNG、WebPのファイルを選んでください');
+ if(!TYPES[type])throw Error('PDF、写真（JPEG・PNG・WebP）、動画（MP4・MOV・WebM）のファイルを選んでください');
  if(!(size>0)||size>MAX_BYTES)throw Error('1ファイル20MBまでです');
  return {
   id:randomUUID(),place,placeKey:placeKey(place),kind:TYPES[type],type,name:str(name,200)||'file',size,title,

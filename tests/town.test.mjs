@@ -72,3 +72,12 @@ test('town answer sends sources and attached files to Gemini and returns numbere
   assert.deepEqual(rg.regions.map(r=>r.id),['kansai']);
  })}finally{await g.close()}
 });
+
+test('video: sniffed by header, registered as 動画, and never attached to Gemini',()=>{
+ const mp4=Buffer.concat([Buffer.from([0,0,0,24]),Buffer.from('ftypisom')]),mov=Buffer.concat([Buffer.from([0,0,0,20]),Buffer.from('ftypqt  ')]),webm=Buffer.from([0x1a,0x45,0xdf,0xa3,0,0,0,0,0,0,0,0]);
+ assert.equal(sniff(mp4),'video/mp4');assert.equal(sniff(mov),'video/quicktime');assert.equal(sniff(webm),'video/webm');
+ const rec=materialRecord({place:'青葉地区',title:'提灯の運び方',description:'体育館から神社へ運ぶ様子',consent:true},{name:'a.mp4',type:'video/mp4',size:1000},'w');
+ assert.equal(rec.kind,'動画');
+ const s=buildSources({place:'青葉地区',materials:[{...rec,size:1000}]}).at(-1);
+ assert.equal(s.file,null);assert.ok(s.text.includes('動画の中身は確認していない')&&s.text.includes('体育館から神社へ'));
+});

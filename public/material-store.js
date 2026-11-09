@@ -78,7 +78,7 @@ export async function fileUrl(id) {
   return url;
 }
 export const MAX_BYTES = 20 * 1024 * 1024;
-export const ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
+export const ACCEPT = "application/pdf,image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm";
 export function kindOf(type) {
-  return type === "application/pdf" ? "PDF資料" : type.startsWith("image/") ? "写真" : null;
+  return type === "application/pdf" ? "PDF資料" : type.startsWith("image/") ? "写真" : /^video\/(mp4|quicktime|webm)$/.test(type) ? "動画" : null;
 }
