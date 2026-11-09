@@ -120,7 +120,7 @@ function shell(content) {
     )
     .join("");
   $("#app").innerHTML =
-    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><a class="brand" href="#" data-page="hub">${logo(40)}<span><strong>ツギ<span class="wm-b">キキ</span></strong><small>継ぐために、聞く。</small></span></a><nav class="side-nav" aria-label="主なメニュー"><button class="nav-item ${page === "hub" ? "is-current" : ""}" data-page="hub">${icon("leaf")}ホーム</button><button class="nav-item ${["welcome", "place", "regions"].includes(page) && intakePurpose() !== "record" ? "is-current" : ""}" id="view-entry">${icon("compass")}行事の段取りを調べる<small>町の歴史・行事の段取り</small></button><button class="nav-item nav-record ${["interview", "materials"].includes(page) || (page === "welcome" && intakePurpose() === "record") ? "is-current" : ""}" id="record-entry">${icon("mic")}行事の段取りを残す<small>語り手の方はこちら</small></button></nav><details class="side-history" ${state.requests.length ? "open" : ""}><summary>これまでの相談<span>${state.requests.length}</span></summary>${history || '<p class="side-empty">まだありません。町の名前から探してみてください。</p>'}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")}設定</button><p class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード（ルール処理）"}<br>生の音声は保存しません</p></div></aside><main><div class="scrim" aria-hidden="true"></div><header class="topbar"><button class="mobile-menu" aria-label="メニューを開く" aria-expanded="false">${icon("menu")}</button><a class="product" href="#" data-page="hub">${logo(28)}<span>ツギ<span class="wm-b">キキ</span></span></a><span class="status"><span class="status-dot ${config.aiReady ? "on" : ""}"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</span></header><div class="page ${entering ? "page-enter" : ""}">${content}</div><footer class="footer"><p>青葉地区・田中さんは架空の地区と人物です。初期のお話はデモ用の創作です。</p><p>${esc(saveMessage)}。${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</p></footer></main><dialog id="dialog"></dialog>`;
+    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><a class="brand" href="#" data-page="hub">${logo(40)}<span><strong>ツギ<span class="wm-b">キキ</span></strong><small>継ぐために、聞く。</small></span></a><nav class="side-nav" aria-label="主なメニュー"><button class="nav-item ${page === "hub" ? "is-current" : ""}" data-page="hub">${icon("leaf")}ホーム</button><button class="nav-item ${["welcome", "place", "regions"].includes(page) && intakePurpose() !== "record" ? "is-current" : ""}" id="view-entry">${icon("compass")}行事の段取りを調べる<small>町の歴史・行事の段取り</small></button><button class="nav-item nav-record ${["interview", "materials"].includes(page) || (page === "welcome" && intakePurpose() === "record") ? "is-current" : ""}" id="record-entry">${icon("mic")}行事の段取りを残す<small>語り手の方はこちら</small></button></nav><details class="side-history" ${state.requests.length ? "open" : ""}><summary>これまでの相談<span>${state.requests.length}</span></summary>${history || '<p class="side-empty">まだありません。町の名前から探してみてください。</p>'}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")}設定</button><p class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード（ルール処理）"}<br>生の音声は保存しません</p></div></aside><main><div class="scrim" aria-hidden="true"></div><header class="topbar"><button class="mobile-menu" aria-label="メニューを開く" aria-expanded="false">${icon("menu")}</button><a class="product" href="#" data-page="hub">${logo(28)}<span>ツギ<span class="wm-b">キキ</span></span></a><span class="status"><span class="status-dot ${config.aiReady ? "on" : ""}"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</span></header><div class="page ${entering ? "page-enter" : ""}">${content}</div><footer class="footer"><p>デモに登場する町・人物・語りは、すべて架空のものです。実在の地域の知識ではありません。</p><p>${esc(saveMessage)}。${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</p></footer></main><dialog id="dialog"></dialog>`;
   entering = false;
   document.querySelectorAll("[data-page]").forEach(
     (b) =>
@@ -808,15 +808,13 @@ function localTownAnswer(question) {
     },
     parts = [],
     materials = new Set();
-  if (town) {
-    for (const k of (town.knowledge || []).filter((k) => k.words.test(question)).slice(0, 2)) {
-      parts.push(k.text.replace(/\[(\w+)\]/g, (_, id) => cite(town.sources.find((s) => s.id === id))));
-      k.materials.forEach((m) => materials.add(m));
-    }
-  }
-  for (const r of placeRequests().filter((r) => r.card)) {
-    const keys = answerKeys(question, r.card);
-    if (!keys.length) continue;
+  const best = placeRequests()
+    .filter((r) => r.card)
+    .map((r) => ({ r, keys: answerKeys(question, r.card) }))
+    .filter((x) => x.keys.length)
+    .sort((a, b) => b.keys.length - a.keys.length)[0];
+  if (best) {
+    const { r, keys } = best;
     const src = {
       id: "card-" + r.id,
       title: `${r.speaker}の語り「${r.card.title}」`,
@@ -829,6 +827,12 @@ function localTownAnswer(question) {
     parts.push(
       `地域の方の語りでは、${keys.map((k) => `${r.card.facts[k].label}は「${r.card.facts[k].value}」`).join("、")}とのことです${cite(src)}。`,
     );
+  }
+  if (town) {
+    for (const k of (town.knowledge || []).filter((k) => k.words.test(question)).slice(0, best ? 1 : 2)) {
+      parts.push(k.text.replace(/\[(\w+)\]/g, (_, id) => cite(town.sources.find((s) => s.id === id))));
+      k.materials.forEach((m) => materials.add(m));
+    }
   }
   const matMaterials = [];
   for (const m of matchMaterials(question)) {
@@ -895,13 +899,12 @@ async function askTown(question) {
 function markCorroboration(text, citations) {
   return String(text).replace(/((?:\[\d+\])+)/g, (group) => {
     const ids = new Set([...group.matchAll(/\[(\d+)\]/g)].map((x) => citations?.[x[1] - 1]?.id ?? "?" + x[1]));
-    return group + (ids.size >= 2 ? "\u0001M\u0001" : "\u0001S\u0001");
+    return group + (ids.size >= 2 ? "\u0001M\u0001" : "");
   });
 }
 function renderAnswer(m, idx) {
   const body = esc(markCorroboration(m.text, m.citations))
     .replace(/\u0001M\u0001/g, '<span class="corro multi" title="別々の資料が、同じ内容を挙げています">複数の資料で確認</span>')
-    .replace(/\u0001S\u0001/g, '<span class="corro single" title="この内容を挙げているのは、1つの資料だけです">資料1件のみ</span>')
     .replace(/\n/g, "<br>")
     .replace(
       /\[(\d+)\]/g,
@@ -1012,6 +1015,15 @@ function placePage() {
       (b.onclick = () => {
         const m = log[b.dataset.ask];
         const fictional = /青葉/.test(placeName);
+        const same = state.requests.find((x) => x.status !== "confirmed" && x.question === m.question && x.place === placeName);
+        if (same) {
+          active = same.id;
+          m.askable = false;
+          m.asked = true;
+          saveChats();
+          toast("地域の人への質問として残っています。");
+          return go("request");
+        }
         const r = create(m.question, false, fictional ? DEMO.event : placeName, fictional ? DEMO.task : "町の歴史・暮らし");
         if (!r) return;
         r.place = placeName;
