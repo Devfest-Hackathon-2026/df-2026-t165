@@ -241,13 +241,17 @@ const choiceList = (items, cls = "") =>
 function intakeStep() {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (!a.purpose) return "purpose";
-  if (a.purpose === "record") return !a.place ? "place" : a.how ? "done" : "how";
+  if (a.purpose === "record") return !a.place ? "place" : !a.name ? "name" : a.how ? "done" : "how";
   if (!a.place) return "place";
   return "topic" in a ? "done" : "topic";
 }
 function finishIntake() {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
-  if (a.purpose === "record") return startRecording(a.place, a.how);
+  if (a.purpose === "record") {
+    state.profile = { name: String(a.name || "").trim().slice(0, 40), updatedAt: new Date().toISOString() };
+    save();
+    return startRecording(a.place, a.how, state.profile.name);
+  }
   if (a.place) {
     const t = topics.find(([k]) => k === a.topic);
     const first = t ? a.place + t[2] : a.topic && a.topic !== "none" ? a.topic : "";
@@ -265,7 +269,7 @@ function finishIntake() {
   if (box) box.innerHTML = '<p class="searching" role="status">お答えに合う地域を探しています</p>';
   setTimeout(() => go("regions"), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 900);
 }
-function startRecording(place, how = "talk") {
+function startRecording(place, how = "talk", name = "") {
   const demo = /青葉/.test(place);
   if (how === "files") {
     const existing = state.requests.find((x) => x.kind === "materials" && x.place === place);
@@ -276,10 +280,10 @@ function startRecording(place, how = "talk") {
   }
   const r =
     how === "files"
-      ? create(`${place}の祭り・行事の資料（PDF・写真）`, demo, demo ? DEMO.event : place, "行事の資料")
+      ? create(`${place}の祭り・行事の資料（PDF・写真）`, demo, demo ? DEMO.event : place, "行事の資料", name)
       : demo
-    ? create(DEMO.question, true)
-    : create(`${place}の祭りや行事について、段取りを聞かせてください。`, false, place, "行事の段取り");
+    ? create(DEMO.question, true, DEMO.event, DEMO.task, name)
+    : create(`${place}の祭りや行事について、段取りを聞かせてください。`, false, place, "行事の段取り", name);
   if (!r) return;
   r.place = place;
   if (how === "files") {
@@ -297,6 +301,12 @@ const tiles = (options, multi = false) =>
 function questionFor(step) {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (step === "purpose") return { q: "こんにちは。今日は、どちらをしますか？", body: choiceList(purposes) };
+  if (step === "name")
+    return {
+      q: "お名前を教えてください。",
+      hint: "呼ばれている名前で大丈夫です。お話の語り手として、この名前で記録します。",
+      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">お名前</label><input class="field field-place" id="free" autocomplete="name" maxlength="40" placeholder="例：田中、山田さん" value="${esc(state.profile?.name || "")}" required><button class="primary-btn">次へ</button></form>`,
+    };
   if (step === "place")
     return {
       q: a.purpose === "record" ? "どの町の、祭りや行事の段取りを残しますか？" : "どの町の、祭りや行事ですか？",
@@ -394,12 +404,12 @@ function welcome() {
     { q, hint, body } = questionFor(cur),
     stepId = cur + intake.history.length,
     first = !intake.typed.has(stepId);
-  const keyLabel = { purpose: "目的", knows: "町名", place: "町", topic: "知りたいこと", how: "残し方", env: "場所", values: "大事なこと", area: "方面", note: "ほか" };
+  const keyLabel = { purpose: "目的", knows: "町名", place: "町", name: "お名前", topic: "知りたいこと", how: "残し方", env: "場所", values: "大事なこと", area: "方面", note: "ほか" };
   const past = intake.history
     .map((x) => `<li><span>${keyLabel[x.key] || ""}</span><b>${esc(x.label)}</b></li>`)
     .join("");
   const a0 = Object.fromEntries(intake.history.map((x) => [x.key, x.value])),
-    total = 3,
+    total = a0.purpose === "record" ? 4 : 3,
     nowAt = Math.min(intake.history.length + 1, total),
     progress = `<div class="progress" role="img" aria-label="${total}問中${nowAt}問目">${Array.from({ length: total }, (_, i) => `<span class="${i < nowAt - 1 ? "done" : i === nowAt - 1 ? "now" : ""}"></span>`).join("")}<small>${nowAt} / ${total}</small></div>`;
   shell(
@@ -1011,10 +1021,10 @@ function placePage() {
     askTown(q);
   }
 }
-function create(question, sample = false, event = DEMO.event, task = DEMO.task) {
+function create(question, sample = false, event = DEMO.event, task = DEMO.task, speaker = "") {
   try {
     if (state.requests.length >= 40) throw Error("この端末では40件まで保存できます。記録を書き出してチームにご相談ください。");
-    const r = validateRequest({ question, sampleData: sample, event, task, speaker: DEMO.speaker });
+    const r = validateRequest({ question, sampleData: sample, event, task, speaker: speaker || DEMO.speaker });
     state.requests.unshift(r);
     active = r.id;
     save();
