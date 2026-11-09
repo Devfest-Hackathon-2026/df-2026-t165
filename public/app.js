@@ -1181,7 +1181,7 @@ function review() {
     `<section class="page-header">${stepper(3)}<h1>${draft ? "この内容で、伝わりますか？" : "次の準備で、また使える。"}</h1><p>${draft ? "元のお話を確かめながら、必要なら書き直してください。" : "質問から聞き取った内容を、出どころと一緒に残しました。"}</p></section><div class="review-layout"><article class="paper-card"><p class="meta">${esc(r.event)}／${esc(r.speaker)}</p><h2>${esc(c.title)}</h2>${draft ? "" : '<p class="verified">語り手と確認済み</p><br>'}<div class="facts">${FACTS.map(
       ([k, label]) => {
         const f = c.facts[k];
-        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(r.reviewValues?.[k] ?? f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}${f.sourceIds.length ? `<button class="source-btn" data-source="${k}">元のお話を確かめる</button>` : ""}</section>`;
+        return `<section class="fact"><label class="fact-label" for="fact-${k}">${label}${f.status === "unknown" ? "<span>未確認</span>" : ""}</label>${draft ? `<textarea class="field" id="fact-${k}">${esc(r.reviewValues?.[k] ?? f.value)}</textarea>` : `<p class="fact-value ${f.status === "unknown" ? "unknown" : ""}">${esc(f.value)}</p>`}</section>`;
       },
     ).join(
       "",
@@ -1196,22 +1196,6 @@ function review() {
       };
       $("#fact-" + k).onchange = save;
     }
-  document.querySelectorAll("[data-source]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        const f = c.facts[b.dataset.source];
-        modal(
-          `<h2>この内容の出どころ</h2><p>${esc(f.label)}：${esc(f.value)}</p>${f.sourceIds
-            .map((id) => {
-              const t = r.turns.find((t) => t.id === id);
-              return `<blockquote class="source-quote">${esc(t?.text || "元発言が見つかりません")}</blockquote>`;
-            })
-            .join(
-              "",
-            )}<div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`,
-        );
-      }),
-  );
   $("#resume").onclick = beginInterview;
   $("#save-card")?.addEventListener("click", () => {
     try {
