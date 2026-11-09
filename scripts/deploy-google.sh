@@ -11,7 +11,7 @@ command -v gcloud >/dev/null || { echo 'Google Cloud Shellで実行してくだ�
 echo "公開先: $TSUGITE_PROJECT / $TSUGITE_REGION"
 echo 'Cloud Run・Firestore・Cloud Storage・ビルド・Secret Managerを設定します。請求先の有効化が必要です。'
 gcloud projects describe "$TSUGITE_PROJECT" --format='value(projectId)'
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com firestore.googleapis.com storage.googleapis.com secretmanager.googleapis.com iam.googleapis.com --project="$TSUGITE_PROJECT"
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com firestore.googleapis.com storage.googleapis.com secretmanager.googleapis.com iam.googleapis.com aiplatform.googleapis.com --project="$TSUGITE_PROJECT"
 for TSUGITE_ACCOUNT in tsugite-runtime tsugite-build; do
  if ! gcloud iam service-accounts describe "$TSUGITE_ACCOUNT@$TSUGITE_PROJECT.iam.gserviceaccount.com" --project="$TSUGITE_PROJECT" >/dev/null 2>&1; then
   gcloud iam service-accounts create "$TSUGITE_ACCOUNT" --project="$TSUGITE_PROJECT" --display-name="$TSUGITE_ACCOUNT"
@@ -20,6 +20,7 @@ done
 TSUGITE_RUNTIME="tsugite-runtime@$TSUGITE_PROJECT.iam.gserviceaccount.com"
 TSUGITE_BUILDER="tsugite-build@$TSUGITE_PROJECT.iam.gserviceaccount.com"
 gcloud projects add-iam-policy-binding "$TSUGITE_PROJECT" --member="serviceAccount:$TSUGITE_RUNTIME" --role=roles/datastore.user --condition=None >/dev/null
+gcloud projects add-iam-policy-binding "$TSUGITE_PROJECT" --member="serviceAccount:$TSUGITE_RUNTIME" --role=roles/aiplatform.user --condition=None >/dev/null
 gcloud projects add-iam-policy-binding "$TSUGITE_PROJECT" --member="serviceAccount:$TSUGITE_BUILDER" --role=roles/run.builder --condition=None >/dev/null
 if ! gcloud firestore databases describe --database="$TSUGITE_DB" --project="$TSUGITE_PROJECT" >/dev/null 2>&1; then
  gcloud firestore databases create --database="$TSUGITE_DB" --location="$TSUGITE_REGION" --type=firestore-native --project="$TSUGITE_PROJECT"
