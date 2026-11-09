@@ -445,6 +445,7 @@ function welcome() {
   if ($("#area-map"))
     mountMapPicker($("#area-map"), {
       confirmLabel: "この地域で候補を探す",
+      mapsKey: config.mapsKey,
       onPick: ({ region, pref }) => commit("area", candidateKey(region, pref), pref ? `${region.name}・${pref}` : region.name, pref || region.name),
     });
   if ($("#open-map"))
@@ -455,6 +456,7 @@ function welcome() {
         slot.dataset.ready = "1";
         mountMapPicker(slot, {
           confirmLabel: "この地域で入力する",
+          mapsKey: config.mapsKey,
           onPick: ({ region, pref }) => {
             const f = $("#free");
             f.value = (pref || region.name) + " ";
