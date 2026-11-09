@@ -890,8 +890,17 @@ async function askTown(question) {
   saveChats();
   if (page === "place") placePage();
 }
+// 裏取りの印：文ごとに、挙げた根拠が別々の資料いくつか数える（AIの判断ではなく、引用の数で決まる）
+function markCorroboration(text, citations) {
+  return String(text).replace(/((?:\[\d+\])+)/g, (group) => {
+    const ids = new Set([...group.matchAll(/\[(\d+)\]/g)].map((x) => citations?.[x[1] - 1]?.id ?? "?" + x[1]));
+    return group + (ids.size >= 2 ? "\u0001M\u0001" : "\u0001S\u0001");
+  });
+}
 function renderAnswer(m, idx) {
-  const body = esc(m.text)
+  const body = esc(markCorroboration(m.text, m.citations))
+    .replace(/\u0001M\u0001/g, '<span class="corro multi" title="別々の資料が、同じ内容を挙げています">複数の資料で確認</span>')
+    .replace(/\u0001S\u0001/g, '<span class="corro single" title="この内容を挙げているのは、1つの資料だけです">資料1件のみ</span>')
     .replace(/\n/g, "<br>")
     .replace(
       /\[(\d+)\]/g,

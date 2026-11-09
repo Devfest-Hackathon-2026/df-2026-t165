@@ -3811,3 +3811,6 @@ h3,
 .product .wm-b {
   color: #8f5700;
 }
+.corro{display:inline-block;margin:0 .35em 0 .2em;padding:.05em .55em;border-radius:99px;font-size:.72em;line-height:1.6;vertical-align:.15em;white-space:nowrap;border:1px solid}
+.corro.multi{color:#1c3a6e;background:#e6ecf7;border-color:#b9c7e2;font-weight:700}
+.corro.single{color:#6b5a3a;background:#f6efe0;border-color:#dccfb6}
