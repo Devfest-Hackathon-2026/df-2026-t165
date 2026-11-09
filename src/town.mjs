@@ -15,7 +15,7 @@ export function buildSources({place,materials=[],stories=[]}){
  for(const m of materials.slice(0,30)){
   const attach=files<FILE_LIMITS.count&&m.size<=FILE_LIMITS.each&&m.size<=budget;
   if(attach){files++;budget-=m.size}
-  add({id:'mat-'+m.id,title:`「${m.title}」`,author:m.source||`${m.addedBy||'住民'}が登録`,year:m.era||'年代不明',kind:`${m.kind}（住民が登録）`,excerpt:m.description||'説明は登録されていません',where:'住民の方がツギテに登録した資料です',fileId:m.id,fileKind:m.kind,server:true},
+  add({id:'mat-'+m.id,title:`「${m.title}」`,author:m.source||`${m.addedBy||'住民'}が登録`,year:m.era||'年代不明',kind:`${m.kind}（住民が登録）`,excerpt:m.description||'説明は登録されていません',where:'住民の方がツギキキに登録した資料です',fileId:m.id,fileKind:m.kind,server:true},
    `住民が登録した${m.kind}「${m.title}」（年代：${m.era||'不明'}／出どころ：${m.source||'不明'}）。登録者の説明：${m.description||'なし'}${attach?'（ファイルの中身を添付）':''}`,attach?m:null);
  }
  for(const s of stories)add({id:'card-'+s.requestId,title:`${s.speaker}の語り「${s.title}」`,author:s.speaker,year:s.confirmedAt?new Date(s.confirmedAt).toLocaleDateString('ja-JP'):'',kind:'聞き取り（語り手が確認済み）',excerpt:s.facts.map(f=>`${f.label}：${f.value}`).join('\n'),requestId:s.requestId},
@@ -34,7 +34,7 @@ export function cleanHistory(raw){
  return (Array.isArray(raw)?raw:[]).slice(-10).map(m=>({role:m?.role==='user'?'user':'assistant',text:str(m?.text,1200)})).filter(m=>m.text);
 }
 
-export const TOWN_SYSTEM=['あなたは町の記録を案内する「ツギテ」。町に住んでいた人・住む人・これから住む人に、町の歴史や暮らしを伝える。',
+export const TOWN_SYSTEM=['あなたは町の記録を案内する「ツギキキ」。町に住んでいた人・住む人・これから住む人に、町の歴史や暮らしを伝える。',
  '与えられた根拠（S1, S2…）に書かれていることだけで、日本語でやさしく、短めに答える。高齢の方にも読める言葉を使う。',
  '根拠を使った文の終わりに [S1] の形で番号を付ける。複数なら [S1][S3]。根拠にないことは書かない。推測しない。一般常識で補わない。',
  '言い伝え・伝聞は、そうだと分かるように書く。年代が不確かなら不確かと書く。',

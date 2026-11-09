@@ -119,7 +119,7 @@ function shell(content) {
     )
     .join("");
   $("#app").innerHTML =
-    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><a class="brand" href="#" data-page="hub">${logo(40)}<span><strong>ツギテ</strong><small>町の記憶を、次の担い手へ</small></span></a><nav class="side-nav" aria-label="主なメニュー"><button class="nav-item ${page === "hub" ? "is-current" : ""}" data-page="hub">${icon("leaf")}ホーム</button><button class="nav-item ${["welcome", "place", "regions"].includes(page) && intakePurpose() !== "record" ? "is-current" : ""}" id="view-entry">${icon("compass")}行事の段取りを調べる<small>町の歴史・行事の段取り</small></button><button class="nav-item nav-record ${["interview", "materials"].includes(page) || (page === "welcome" && intakePurpose() === "record") ? "is-current" : ""}" id="record-entry">${icon("mic")}行事の段取りを残す<small>語り手の方はこちら</small></button></nav><details class="side-history" ${state.requests.length ? "open" : ""}><summary>これまでの相談<span>${state.requests.length}</span></summary>${history || '<p class="side-empty">まだありません。町の名前から探してみてください。</p>'}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")}設定</button><p class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード（ルール処理）"}<br>生の音声は保存しません</p></div></aside><main><div class="scrim" aria-hidden="true"></div><header class="topbar"><button class="mobile-menu" aria-label="メニューを開く" aria-expanded="false">${icon("menu")}</button><a class="product" href="#" data-page="hub">${logo(28)}<span>ツギテ</span></a><span class="status"><span class="status-dot ${config.aiReady ? "on" : ""}"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</span></header><div class="page ${entering ? "page-enter" : ""}">${content}</div><footer class="footer"><p>青葉地区・田中さんは架空の地区と人物です。初期のお話はデモ用の創作です。</p><p>${esc(saveMessage)}。${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</p></footer></main><dialog id="dialog"></dialog>`;
+    `<aside><button class="close-menu" aria-label="メニューを閉じる">${icon("close")}</button><a class="brand" href="#" data-page="hub">${logo(40)}<span><strong>ツギ<span class="wm-b">キキ</span></strong><small>継ぐために、聞く。</small></span></a><nav class="side-nav" aria-label="主なメニュー"><button class="nav-item ${page === "hub" ? "is-current" : ""}" data-page="hub">${icon("leaf")}ホーム</button><button class="nav-item ${["welcome", "place", "regions"].includes(page) && intakePurpose() !== "record" ? "is-current" : ""}" id="view-entry">${icon("compass")}行事の段取りを調べる<small>町の歴史・行事の段取り</small></button><button class="nav-item nav-record ${["interview", "materials"].includes(page) || (page === "welcome" && intakePurpose() === "record") ? "is-current" : ""}" id="record-entry">${icon("mic")}行事の段取りを残す<small>語り手の方はこちら</small></button></nav><details class="side-history" ${state.requests.length ? "open" : ""}><summary>これまでの相談<span>${state.requests.length}</span></summary>${history || '<p class="side-empty">まだありません。町の名前から探してみてください。</p>'}</details><div class="side-bottom"><button class="settings" id="settings">${icon("settings")}設定</button><p class="side-label">${config.aiReady ? "Google AI 接続設定あり" : "体験モード（ルール処理）"}<br>生の音声は保存しません</p></div></aside><main><div class="scrim" aria-hidden="true"></div><header class="topbar"><button class="mobile-menu" aria-label="メニューを開く" aria-expanded="false">${icon("menu")}</button><a class="product" href="#" data-page="hub">${logo(28)}<span>ツギ<span class="wm-b">キキ</span></span></a><span class="status"><span class="status-dot ${config.aiReady ? "on" : ""}"></span>${config.aiReady ? "AI接続設定あり" : "体験モード"}</span></header><div class="page ${entering ? "page-enter" : ""}">${content}</div><footer class="footer"><p>青葉地区・田中さんは架空の地区と人物です。初期のお話はデモ用の創作です。</p><p>${esc(saveMessage)}。${config.aiReady ? "Geminiの生成結果は、語り手と確認してから利用します。" : "現在の聞き取りと整理は体験用のルール処理です。"}</p></footer></main><dialog id="dialog"></dialog>`;
   entering = false;
   document.querySelectorAll("[data-page]").forEach(
     (b) =>
@@ -792,7 +792,7 @@ const materialSource = (m) => ({
   year: m.era || "年代不明",
   kind: `${m.kind}（住民が登録）`,
   excerpt: m.description || "説明は登録されていません",
-  where: "住民の方がツギテに登録した資料です",
+  where: "住民の方がツギキキに登録した資料です",
   fileId: m.id,
   fileKind: m.kind,
 });
@@ -842,7 +842,7 @@ function localTownAnswer(question) {
     return {
       text: town
         ? "この質問に答えられる資料は、まだ登録されていません。わからないことを推測で答えることはしません。地域の方に聞いてみませんか？"
-        : `${placeName}の資料は、まだツギテに登録されていません。わからないことを推測で答えることはしません。図書館の郷土資料や、役所の文化財・生涯学習の担当で調べられることがあります。地域の方に聞いてみることもできます。`,
+        : `${placeName}の資料は、まだツギキキに登録されていません。わからないことを推測で答えることはしません。図書館の郷土資料や、役所の文化財・生涯学習の担当で調べられることがあります。地域の方に聞いてみることもできます。`,
       citations: [],
       materials: [],
       askable: true,
@@ -915,7 +915,7 @@ function renderAnswer(m, idx) {
     )
     .join("");
   const n = (m.citations || []).length;
-  return `<div class="msg assistant ${m.fresh ? "is-new" : ""}"><p class="who">${logo(18)}ツギテ　${n ? `資料${n}件をもとに回答` : "資料に記録がありません"}${m.mode === "experience" ? "（体験用）" : ""}</p><div class="answer"><p class="answer-text">${body}</p>${cites ? `<div class="src-row"><span class="src-label">根拠</span>${cites}</div>` : ""}${mats ? `<div class="answer-materials"><p class="answer-label">こんな資料もあります</p><ul class="material-list">${mats}</ul></div>` : ""}${m.askable ? `<div class="answer-ask"><button class="secondary-btn" data-ask="${idx}">この質問を地域の人に聞く</button><span class="small">語り部への次の聞き取りのテーマになります。</span></div>` : ""}</div></div>`;
+  return `<div class="msg assistant ${m.fresh ? "is-new" : ""}"><p class="who">${logo(18)}ツギキキ　${n ? `資料${n}件をもとに回答` : "資料に記録がありません"}${m.mode === "experience" ? "（体験用）" : ""}</p><div class="answer"><p class="answer-text">${body}</p>${cites ? `<div class="src-row"><span class="src-label">根拠</span>${cites}</div>` : ""}${mats ? `<div class="answer-materials"><p class="answer-label">こんな資料もあります</p><ul class="material-list">${mats}</ul></div>` : ""}${m.askable ? `<div class="answer-ask"><button class="secondary-btn" data-ask="${idx}">この質問を地域の人に聞く</button><span class="small">語り部への次の聞き取りのテーマになります。</span></div>` : ""}</div></div>`;
 }
 function contactsHtml(town) {
   if (town)
@@ -930,7 +930,7 @@ function placePage() {
     log = townChats[placeName] || [],
     stories = placeRequests().filter((r) => r.card),
     uploads = placeMaterials();
-  const intro = `<div class="msg assistant"><p class="who">${logo(18)}ツギテ</p><div class="answer"><p class="answer-text">${esc(placeName)}について、資料と地域の方の語りをもとにお答えします。根拠は番号で示し、わからないことは推測しません。下の質問例からどうぞ。</p></div></div>`;
+  const intro = `<div class="msg assistant"><p class="who">${logo(18)}ツギキキ</p><div class="answer"><p class="answer-text">${esc(placeName)}について、資料と地域の方の語りをもとにお答えします。根拠は番号で示し、わからないことは推測しません。下の質問例からどうぞ。</p></div></div>`;
   const msgs = log
     .map((m, i) =>
       m.role === "user"
@@ -1083,7 +1083,7 @@ function interview() {
   if (!r) return go("hub");
   const composerHtml = `<div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon("mic")}</button><button class="round primary" ${busy ? "disabled" : ""} aria-label="お話を伝える">${icon("send")}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button></div>`;
   shell(
-    `<section class="page-header">${stepper(2)}<h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form">${
+    `<section class="page-header">${stepper(2)}<h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギキキ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form">${
       config.aiReady
         ? `<div class="voice-hero"><button type="button" class="voice-btn" id="live" aria-label="声で話しかける">${icon("mic")}</button><p class="voice-title">押して、話しかける</p><p class="voice-note">最大5分。声は保存せず、文字にして記録します。</p></div><div class="voice-secondary"><button type="button" class="secondary-btn" id="show-text" aria-expanded="false" aria-controls="text-entry">文字で入力する</button><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div><div id="text-entry" class="text-entry" hidden>${composerHtml}</div>`
         : `${composerHtml}<div class="inline-actions"><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div>`
@@ -1289,7 +1289,7 @@ async function startLive() {
         save();
         const p = document.createElement("div");
         p.className = "msg " + role;
-        p.innerHTML = `<p class="who">${role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(text)}</p>`;
+        p.innerHTML = `<p class="who">${role === "user" ? esc(r.speaker) : "ツギキキ"}</p><p class="bubble">${esc(text)}</p>`;
         $(".chat-log")?.append(p);
         if ($(".chat-log")) $(".chat-log").scrollTop = $(".chat-log").scrollHeight;
       },
@@ -1447,7 +1447,7 @@ function settings() {
         go("metrics");
       };
       $("#export-json").onclick = () =>
-        download("ツギテ_記録.json", JSON.stringify(state, null, 2), "application/json");
+        download("ツギキキ_記録.json", JSON.stringify(state, null, 2), "application/json");
       $("#export-csv").onclick = exportCSV;
       $("#set-access")?.addEventListener("click", async () => {
         code = $("#access").value;
@@ -1485,7 +1485,7 @@ function exportCSV() {
   const rows = state.measurements.map((m) =>
     cols.map((k) => '"' + String(m[k] ?? "").replaceAll('"', '""') + '"').join(","),
   );
-  download("ツギテ_測定.csv", "\uFEFF" + cols.join(",") + "\n" + rows.join("\n"), "text/csv;charset=utf-8");
+  download("ツギキキ_測定.csv", "\uFEFF" + cols.join(",") + "\n" + rows.join("\n"), "text/csv;charset=utf-8");
 }
 function measurementSetup() {
   const r = current();

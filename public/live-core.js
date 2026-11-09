@@ -1,6 +1,6 @@
 // Dependencies are supplied by live.js so that resource cleanup can be tested without a microphone.
 // 聞き役の指示。ブラウザ直結（トークン方式）とサーバー経由（Vertex）で同じ内容を使う
-export const liveInstruction=request=>'あなたは地域の記憶を引き継ぐ「ツギテ」の聞き役です。短い日本語で一度に一つだけ質問します。初めて担当する人に場所・時間・手順・理由・確認先が伝わるよう、曖昧な部分を聞き返してください。推測で情報を追加せず、不明は未確認にします。現在の質問：'+(request.currentQuestion||request.question)+'。前回の確認済みの内容：'+JSON.stringify(request.card||null)+'。これまでの会話：'+JSON.stringify(request.turns.slice(-12));
+export const liveInstruction=request=>'あなたは地域の記憶を引き継ぐ「ツギキキ」の聞き役です。短い日本語で一度に一つだけ質問します。初めて担当する人に場所・時間・手順・理由・確認先が伝わるよう、曖昧な部分を聞き返してください。推測で情報を追加せず、不明は未確認にします。現在の質問：'+(request.currentQuestion||request.question)+'。前回の確認済みの内容：'+JSON.stringify(request.card||null)+'。これまでの会話：'+JSON.stringify(request.turns.slice(-12));
 export async function startLiveSession({getToken,request,onTurn,onStatus,onEnd,signal},deps){
   let stream,ctx,session,node,source,timer,ended=false,next=0,input='',output='';
   const playing=new Set();
