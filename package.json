@@ -12,7 +12,8 @@
   "dependencies": {
     "@google-cloud/firestore": "latest",
     "@google-cloud/storage": "^8.4.0",
-    "@google/genai": "latest"
+    "@google/genai": "latest",
+    "ws": "^8.22.2"
   },
   "devDependencies": {
     "esbuild": "latest"

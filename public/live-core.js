@@ -1,4 +1,6 @@
 // Dependencies are supplied by live.js so that resource cleanup can be tested without a microphone.
+// 聞き役の指示。ブラウザ直結（トークン方式）とサーバー経由（Vertex）で同じ内容を使う
+export const liveInstruction=request=>'あなたは地域の記憶を引き継ぐ「ツギテ」の聞き役です。短い日本語で一度に一つだけ質問します。初めて担当する人に場所・時間・手順・理由・確認先が伝わるよう、曖昧な部分を聞き返してください。推測で情報を追加せず、不明は未確認にします。現在の質問：'+(request.currentQuestion||request.question)+'。前回の確認済みの内容：'+JSON.stringify(request.card||null)+'。これまでの会話：'+JSON.stringify(request.turns.slice(-12));
 export async function startLiveSession({getToken,request,onTurn,onStatus,onEnd,signal},deps){
   let stream,ctx,session,node,source,timer,ended=false,next=0,input='',output='';
   const playing=new Set();
@@ -25,8 +27,7 @@ export async function startLiveSession({getToken,request,onTurn,onStatus,onEnd,s
     if(ended){stream.getTracks().forEach(track=>track.stop());return}
     ctx=new deps.AudioContext({sampleRate:24000});await ctx.resume();cancelled();
     const token=await getToken();cancelled();
-    const ai=new deps.GoogleGenAI({apiKey:token.token,httpOptions:{apiVersion:'v1beta'}});
-    session=await ai.live.connect({model:token.model,config:{responseModalities:[deps.Modality.AUDIO],inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:'あなたは地域の記憶を引き継ぐ「ツギテ」の聞き役です。短い日本語で一度に一つだけ質問します。初めて担当する人に場所・時間・手順・理由・確認先が伝わるよう、曖昧な部分を聞き返してください。推測で情報を追加せず、不明は未確認にします。現在の質問：'+(request.currentQuestion||request.question)+'。前回の確認済みの内容：'+JSON.stringify(request.card||null)+'。これまでの会話：'+JSON.stringify(request.turns.slice(-12))}]}},callbacks:{
+    const connectArgs={model:token.model,config:{responseModalities:[deps.Modality.AUDIO],inputAudioTranscription:{},outputAudioTranscription:{},systemInstruction:{parts:[{text:liveInstruction(request)}]}},callbacks:{
       onmessage:m=>{
         if(ended)return;
         const s=m.serverContent;if(!s)return;
@@ -48,7 +49,9 @@ export async function startLiveSession({getToken,request,onTurn,onStatus,onEnd,s
       },
       onerror:()=>stop('音声接続でエラーが発生しました。接続設定やモデル名を確認してください。'),
       onclose:()=>stop()
-    }});
+    }};
+    // proxy：サーバーがVertexに中継する（ブラウザにはキーも認証情報も渡さない）。token：ブラウザからGeminiに直結する
+    session=token.proxy?await deps.connectProxy({url:token.url,ticket:token.ticket,request:{currentQuestion:request.currentQuestion||request.question,card:request.card||null,turns:request.turns.slice(-12)},callbacks:connectArgs.callbacks}):await new deps.GoogleGenAI({apiKey:token.token,httpOptions:{apiVersion:'v1beta'}}).live.connect(connectArgs);
     if(ended){session.close();return}
     await ctx.audioWorklet.addModule('./pcm-worklet.js');cancelled();
     source=ctx.createMediaStreamSource(stream);node=new deps.AudioWorkletNode(ctx,'pcm-capture');
