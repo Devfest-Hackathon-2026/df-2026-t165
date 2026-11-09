@@ -42,6 +42,7 @@ const SKIP=['9 作業領域IDを変えて連続で呼ぶ（全体上限は未実
 let failed=0;
 console.log(`攻撃テスト ${BASE}  各${RUNS}回`);
 for(const [name,run,judge] of CASES){
+ if(process.env.ONLY&&!name.startsWith(process.env.ONLY+' '))continue;
  let pass=0;const bad=[];
  for(let i=0;i<RUNS;i++){
   try{const t=await run(),why=judge(t);if(why)bad.push(`${why} ｜ ${t.replace(/\s+/g,' ').slice(0,120)}`);else pass++}catch(e){bad.push('呼び出しに失敗：'+e.message)}
