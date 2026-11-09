@@ -14,6 +14,7 @@ import {
 import { townData } from "./town-data.js";
 import { tileArt } from "./tile-art.js";
 import { mountMapPicker, candidateKey } from "./japan-map.js";
+import { seedDemo } from "./seed.js";
 import { putFile, deleteFile, fileUrl, kindOf, MAX_BYTES, ACCEPT, uploadMaterial, listMaterials, removeMaterial, useServerHeaders } from "./material-store.js";
 const $ = (s) => document.querySelector(s),
   esc = (v) =>
@@ -226,9 +227,9 @@ const purposes = [
   ["record", "行事の段取りを残したい", "自分が担ってきた祭りや行事のやり方を、聞き取りで残す"],
 ];
 const topics = [
+  ["steps", "行事の段取りや当番", "の祭りや行事の段取りと当番は、どうなっているの？"],
   ["festival", "由来と、いつから続いているか", "の祭りや行事は、いつから、どんな経緯で続いているの？"],
-  ["steps", "準備の段取り（全体の流れ）", "の祭りや行事の準備は、どんな段取りで進めるの？"],
-  ["roles", "当番・役割分担", "の祭りや行事には、どんな役割や当番があって、どう決めるの？"],
+    ["roles", "当番・役割分担", "の祭りや行事には、どんな役割や当番があって、どう決めるの？"],
   ["rain", "雨の日・天気が悪いとき", "の祭りや行事は、雨の日や天気が悪いときはどうするの？"],
   ["tools", "道具・備品の置き場と管理", "の祭りや行事で使う道具や備品は、どこにあって、誰が管理しているの？"],
   ["money", "費用・寄付・会計", "の祭りや行事の費用は、どう集めて、何に使うの？"],
@@ -387,7 +388,7 @@ function hub() {
     towns = recentTowns(),
     ongoing = state.requests.filter((r) => r.status !== "confirmed").slice(0, 3);
   shell(
-    `<section class="intake hub ${first ? "is-entering" : ""}"><div class="hub-hero">${lanterns()}<div class="hub-head">${logo(84, first)}<div><p class="intake-hello">町の昔を、そこで暮らした人に聞く。</p><h1 class="intake-q"><span class="sr-only">${q}</span><span class="typed" aria-hidden="true" data-text="${q}">${first ? "" : q}</span></h1></div></div></div><div class="intake-body"><div class="hub-actions" style="--i:0"><button class="hub-card is-main" data-start="view">${bookIcon}<strong>行事の段取りを調べる</strong><span>祭りや行事の進め方を、前の担い手の語りと資料から調べます。</span><em>はじめる</em></button><button class="hub-card" data-start="record">${micIcon}<strong>行事の段取りを残す</strong><span>自分が担ってきた祭りや行事のやり方を、聞かれるままに話して残します。</span><em>はじめる</em></button></div><div class="hub-lower" style="--i:1">${towns.length ? `<section class="hub-section"><h2>最近見た町</h2><div class="choices compact">${towns.map((n) => `<button class="town-chip" data-town="${esc(n)}">${esc(n)}</button>`).join("")}</div></section>` : `<section class="hub-section"><h2>まずは試してみる</h2><div class="choices compact"><button class="town-chip" data-town="青葉地区">架空の「青葉地区」</button></div></section>`}${ongoing.length ? `<section class="hub-section"><h2>続きから</h2><ul class="resume-list">${ongoing.map((r) => `<li><button class="resume" data-request="${r.id}"><span><strong>${esc(r.question)}</strong><small>${esc(r.place || r.event)}</small></span><em class="pill">${statuses[r.status] || ""}</em></button></li>`).join("")}</ul></section>` : ""}</div></div><div class="wave-band" aria-hidden="true"></div></section>`,
+    `<section class="intake hub ${first ? "is-entering" : ""}"><div class="hub-hero">${lanterns()}<div class="hub-head">${logo(84, first)}<div><p class="intake-hello">町の昔を、そこで暮らした人に聞く。</p><h1 class="intake-q"><span class="sr-only">${q}</span><span class="typed" aria-hidden="true" data-text="${q}">${first ? "" : q}</span></h1></div></div></div><div class="intake-body"><div class="hub-actions" style="--i:0"><button class="hub-card is-main" data-start="view">${bookIcon}<strong>行事の段取りを調べる</strong><span>祭りや行事の段取りと当番を、地域の人の語りと記録から調べます。前の担当者に聞けなかったことも、ここで確認できます。</span><em>はじめる</em></button><button class="hub-card" data-start="record">${micIcon}<strong>行事の段取りを残す</strong><span>自分が担ってきた祭りや行事のやり方を、聞かれるままに話して残します。</span><em>はじめる</em></button></div><div class="hub-lower" style="--i:1">${towns.length ? `<section class="hub-section"><h2>最近見た町</h2><div class="choices compact">${towns.map((n) => `<button class="town-chip" data-town="${esc(n)}">${esc(n)}</button>`).join("")}</div></section>` : `<section class="hub-section"><h2>まずは試してみる</h2><div class="choices compact"><button class="town-chip" data-town="青葉地区">架空の「青葉地区」</button></div></section>`}${ongoing.length ? `<section class="hub-section"><h2>続きから</h2><ul class="resume-list">${ongoing.map((r) => `<li><button class="resume" data-request="${r.id}"><span><strong>${esc(r.question)}</strong><small>${esc(r.place || r.event)}</small></span><em class="pill">${statuses[r.status] || ""}</em></button></li>`).join("")}</ul></section>` : ""}</div></div><div class="wave-band" aria-hidden="true"></div></section>`,
   );
   document.querySelectorAll("[data-start]").forEach((b) => (b.onclick = () => startIntake(b.dataset.start)));
   document.querySelectorAll("[data-town]").forEach((b) => (b.onclick = () => openPlace(b.dataset.town)));
@@ -1603,6 +1604,7 @@ render();
         localStorage.setItem(key, JSON.stringify(state));
       }
     }
+    if (seedDemo(state)) save();
     saveMessage =
       config.storage === "firestore"
         ? "Firestoreと端末に保存"
@@ -1612,6 +1614,7 @@ render();
     render();
   } catch {
     if (config.storage === "browser") {
+      if (seedDemo(state)) save();
       saveMessage = "この端末のブラウザに保存";
       render();
     } else toast("サーバー保存は未接続です。設定を確認してください。");

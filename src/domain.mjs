@@ -1,10 +1,10 @@
 const randomUUID=()=>globalThis.crypto.randomUUID();
 export const FACTS=[['when','集合時間'],['where','雨天の場所'],['materials','用意するもの'],['steps','作業の順番'],['why','その理由'],['contact','確認先']];
 export const DEMO={event:'青葉地区の夏祭り',task:'提灯の準備',question:'雨の日、提灯はどこで、どう準備すればいいですか？',speaker:'田中さん（架空の語り部）',lines:[
- '祭りの前日は、いつもの場所に朝9時に集まります。',
- '晴れなら公民館の裏庭です。雨なら公民館の集会室で、紙の提灯を組み立てます。',
- '紙の提灯が濡れないようにするためです。外につるすかは、当日の責任者の佐藤さんに確認してください。',
- '紙の提灯とひも、はさみを用意します。まず紙の提灯を組み立てて、それからひもを通します。'
+ '祭りの前日は、いつもの場所に17時に集まります。',
+ '晴れなら公民館の裏庭です。雨なら公民館の1階の和室で、提灯の準備をします。',
+ '提灯を雨で濡らさないためです。迷ったら、提灯係の責任者の田中はるさんに確認してください。',
+ '提灯一式と竹ざお、新聞紙、乾いた布を用意します。まず倉庫から提灯を出して、それから和室に新聞紙を敷きます。'
 ]};
 export const emptyCard=()=>({title:'雨の日の提灯準備',facts:Object.fromEntries(FACTS.map(([k,label])=>[k,{label,value:'未確認',sourceIds:[],status:'unknown'}]))});
 export function validateRequest(r){if(!r||typeof r.question!=='string'||!r.question.trim())throw Error('聞きたいことを入力してください');return {id:randomUUID(),event:String(r.event||DEMO.event).slice(0,100),task:String(r.task||DEMO.task).slice(0,100),question:r.question.trim().slice(0,1000),speaker:String(r.speaker||'地域の経験者').slice(0,100),status:'requested',turns:[],createdAt:new Date().toISOString(),metrics:{},sampleData:Boolean(r.sampleData)}}

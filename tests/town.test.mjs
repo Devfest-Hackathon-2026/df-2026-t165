@@ -54,7 +54,7 @@ test('materials upload, list, download and owner-only delete',()=>running({},asy
  assert.equal((await fetch(base+'/api/town-answer',{method:'POST',body:JSON.stringify({place:'青葉地区',question:'夏祭りは？'})})).status,409,'falls back when Gemini is not set');
 }));
 test('town answer sends sources and attached files to Gemini and returns numbered citations',async()=>{
- const g=await fakeGemini(()=>({text:'夏祭りは昭和25年に青年団が始めました[S1]。駅前の写真も登録されています[S5]。',materials:['S5'],askable:false}));
+ const g=await fakeGemini(()=>({text:'夏祭りは昭和25年に青年団が始めました[S2]。駅前の写真も登録されています[S6]。',materials:['S6'],askable:false}));
  try{await running({GEMINI_API_KEY:'test-key',GEMINI_BASE_URL:g.url,GEMINI_TEXT_MODEL:'fake-flash',DEMO_ACCESS_CODE:'code'},async base=>{
   const wid=randomUUID(),h={'x-workspace-id':wid,'x-demo-access-code':'code'};
   assert.equal((await(await fetch(base+'/api/config')).json()).aiReady,true);
@@ -65,7 +65,7 @@ test('town answer sends sources and attached files to Gemini and returns numbere
   assert.equal(out.mode,'gemini');assert.equal(out.text,'夏祭りは昭和25年に青年団が始めました[1]。駅前の写真も登録されています[2]。');
   assert.equal(out.citations[0].id,'ayumi');assert.equal(out.citations[1].fileKind,'写真');assert.equal(out.citations[1].server,true);
   const sent=g.seen.find(x=>/generateContent/.test(x.url)).body,parts=sent.contents[0].parts;
-  assert.match(parts[0].text,/\[S1\] 『青葉地区のあゆみ』/);assert.match(parts[0].text,/田中さんが確認した語り/);
+  assert.match(parts[0].text,/\[S2\] 『青葉地区のあゆみ』/);assert.match(parts[0].text,/田中さんが確認した語り/);assert.ok(parts[0].text.indexOf('[S1] 田中さんが確認した語り')>=0,'confirmed stories come first');
   assert.equal(parts.filter(p=>p.inlineData?.mimeType==='image/jpeg').length,1,'photo is attached to the prompt');
   assert.match(sent.systemInstruction.parts[0].text,/推測しない/);
   const rg=await(await fetch(base+'/api/regions',{method:'POST',headers:{...h,'content-type':'application/json'},body:JSON.stringify({candidates:[{id:'kansai',name:'関西の町並み'}],answers:['町なか']})})).json();
