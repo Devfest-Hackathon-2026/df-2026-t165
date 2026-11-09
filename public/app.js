@@ -222,15 +222,18 @@ const hearingSteps = [
   },
 ];
 const purposes = [
-  ["view", "町の記録を見たい", "住んでいた町、いま住む町、これから住む町のこと"],
+  ["view", "行事の段取りを知りたい", "祭りや行事の進め方を、前の担い手に聞く"],
   ["record", "町の記録を残したい", "自分の知っている町の話を、聞き取りで残す"],
 ];
 const topics = [
-  ["festival", "祭りや行事のいわれ", "の祭りや行事は、いつから続いているの？"],
-  ["names", "地名や通りの名前の由来", "という地名の由来は？"],
-  ["steps", "行事の段取りや当番", "の行事の準備は、どんな段取りで進めるの？"],
-  ["life", "昔の暮らしや仕事", "では、昔どんな暮らしをしていたの？"],
-  ["change", "町の移り変わり", "は、昔と比べてどう変わったの？"],
+  ["festival", "由来と、いつから続いているか", "の祭りや行事は、いつから、どんな経緯で続いているの？"],
+  ["steps", "準備の段取り（全体の流れ）", "の祭りや行事の準備は、どんな段取りで進めるの？"],
+  ["roles", "当番・役割分担", "の祭りや行事には、どんな役割や当番があって、どう決めるの？"],
+  ["rain", "雨の日・天気が悪いとき", "の祭りや行事は、雨の日や天気が悪いときはどうするの？"],
+  ["tools", "道具・備品の置き場と管理", "の祭りや行事で使う道具や備品は、どこにあって、誰が管理しているの？"],
+  ["money", "費用・寄付・会計", "の祭りや行事の費用は、どう集めて、何に使うの？"],
+  ["contacts", "連絡先・届け出", "の祭りや行事の準備で、どこに連絡や届け出が必要なの？"],
+  ["handover", "担い手集め・引き継ぎ", "の祭りや行事の担い手は、どう集めて、次の人にどう引き継いでいるの？"],
 ];
 const choiceList = (items, cls = "") =>
   `<div class="choices ${cls}">${items.map(([v, l, s], i) => `<button class="choice" style="--i:${i}" data-v="${v}" data-l="${l}"><strong>${l}</strong>${s ? `<span>${s}</span>` : ""}</button>`).join("")}</div>`;
@@ -239,20 +242,15 @@ function intakeStep() {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (!a.purpose) return "purpose";
   if (a.purpose === "record") return !a.place ? "place" : a.how ? "done" : "how";
-  if (!a.knows) return "knows";
-  if (a.knows === "yes") {
-    if (!a.place) return "place";
-    return "topic" in a ? "done" : "topic";
-  }
-  for (const s of hearingSteps) if (!(s.key in a)) return s.key;
-  return "note" in a ? "done" : "note";
+  if (!a.place) return "place";
+  return "topic" in a ? "done" : "topic";
 }
 function finishIntake() {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (a.purpose === "record") return startRecording(a.place, a.how);
   if (a.place) {
     const t = topics.find(([k]) => k === a.topic);
-    const first = t ? (t[0] === "names" ? `「${a.place}」` : a.place) + t[2] : a.topic && a.topic !== "none" ? a.topic : "";
+    const first = t ? a.place + t[2] : a.topic && a.topic !== "none" ? a.topic : "";
     return openPlace(a.place, first);
   }
   const texts = intake.history.filter((x) => x.text).map((x) => x.text);
@@ -299,19 +297,11 @@ const tiles = (options, multi = false) =>
 function questionFor(step) {
   const a = Object.fromEntries(intake.history.map((x) => [x.key, x.value]));
   if (step === "purpose") return { q: "こんにちは。今日は、どちらをしますか？", body: choiceList(purposes) };
-  if (step === "knows")
-    return {
-      q: "知りたい町は、もう決まっていますか？",
-      body: choiceList([
-        ["yes", "決まっている", "町や地区の名前を入力します"],
-        ["no", "まだ決まっていない", "いくつか質問して、合いそうな地域を挙げます"],
-      ]),
-    };
   if (step === "place")
     return {
-      q: a.purpose === "record" ? "どの町のお話を残しますか？" : "どの町のことを知りたいですか？",
+      q: a.purpose === "record" ? "どの町のお話を残しますか？" : "どの町の、祭りや行事ですか？",
       hint: "市町村名でも、地区や通りの名前でも大丈夫です。",
-      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button><button type="button" class="choice-sm" id="open-map">地図から選ぶ</button>${a.purpose === "view" ? '<button class="choice-sm" data-switch="unknown">町の名前が決まっていない</button>' : ""}</div><div id="place-map" class="map-slot" hidden></div>`,
+      body: `<form class="free" id="free-form" style="--i:0"><label class="sr-only" for="free">町や地区の名前</label><input class="field field-place" id="free" autocomplete="off" maxlength="80" placeholder="例：青葉地区、○○市△△町" required><button class="primary-btn">次へ</button></form><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="青葉地区" data-l="青葉地区（架空）">架空の「青葉地区」で試す</button><button type="button" class="choice-sm" id="open-map">地図から選ぶ</button></div><div id="place-map" class="map-slot" hidden></div>`,
     };
   if (step === "how")
     return {
@@ -324,9 +314,9 @@ function questionFor(step) {
     };
   if (step === "topic")
     return {
-      q: `${a.place}の、どんなことを知りたいですか？`,
+      q: `${a.place}の祭りや行事の、どんなことを知りたいですか？`,
       hint: "選んだことから、AIがまず資料と地域の人の語りをもとに答えます。",
-      body: `${tiles(topics)}<form class="free" id="free-form" style="--i:4"><label class="sr-only" for="free">知りたいことを書く</label><input class="field" id="free" autocomplete="off" maxlength="1000" placeholder="自分の言葉で書く（例：駅前の商店街はいつできたの？）" required><button class="secondary-btn">次へ</button></form><div class="choices compact" style="--i:5"><button class="choice-sm" data-v="none" data-l="とくに決めていない">とくに決めていない</button></div>`,
+      body: `${tiles(topics)}<form class="free" id="free-form" style="--i:4"><label class="sr-only" for="free">知りたいことを書く</label><input class="field" id="free" autocomplete="off" maxlength="1000" placeholder="自分の言葉で書く（例：提灯は、いつから準備を始めるの？）" required><button class="secondary-btn">次へ</button></form><div class="choices compact" style="--i:5"><button class="choice-sm" data-v="none" data-l="とくに決めていない">とくに決めていない</button></div>`,
     };
   const s = hearingSteps.find((x) => x.key === step);
   if (s)
@@ -387,7 +377,7 @@ function hub() {
     towns = recentTowns(),
     ongoing = state.requests.filter((r) => r.status !== "confirmed").slice(0, 3);
   shell(
-    `<section class="intake hub ${first ? "is-entering" : ""}"><div class="hub-hero">${lanterns()}<div class="hub-head">${logo(84, first)}<div><p class="intake-hello">町の昔を、そこで暮らした人に聞く。</p><h1 class="intake-q"><span class="sr-only">${q}</span><span class="typed" aria-hidden="true" data-text="${q}">${first ? "" : q}</span></h1></div></div></div><div class="intake-body"><div class="hub-actions" style="--i:0"><button class="hub-card is-main" data-start="view">${bookIcon}<strong>町の記録を見る</strong><span>町の歴史や行事の段取りを、資料と地域の人の語りから調べます。</span><em>はじめる</em></button><button class="hub-card" data-start="record">${micIcon}<strong>町の記録を残す</strong><span>自分の知っている話や、文献のPDF・昔の写真を残します。</span><em>はじめる</em></button></div><div class="hub-lower" style="--i:1">${towns.length ? `<section class="hub-section"><h2>最近見た町</h2><div class="choices compact">${towns.map((n) => `<button class="town-chip" data-town="${esc(n)}">${esc(n)}</button>`).join("")}</div></section>` : `<section class="hub-section"><h2>まずは試してみる</h2><div class="choices compact"><button class="town-chip" data-town="青葉地区">架空の「青葉地区」</button></div></section>`}${ongoing.length ? `<section class="hub-section"><h2>続きから</h2><ul class="resume-list">${ongoing.map((r) => `<li><button class="resume" data-request="${r.id}"><span><strong>${esc(r.question)}</strong><small>${esc(r.place || r.event)}</small></span><em class="pill">${statuses[r.status] || ""}</em></button></li>`).join("")}</ul></section>` : ""}</div></div><div class="wave-band" aria-hidden="true"></div></section>`,
+    `<section class="intake hub ${first ? "is-entering" : ""}"><div class="hub-hero">${lanterns()}<div class="hub-head">${logo(84, first)}<div><p class="intake-hello">町の昔を、そこで暮らした人に聞く。</p><h1 class="intake-q"><span class="sr-only">${q}</span><span class="typed" aria-hidden="true" data-text="${q}">${first ? "" : q}</span></h1></div></div></div><div class="intake-body"><div class="hub-actions" style="--i:0"><button class="hub-card is-main" data-start="view">${bookIcon}<strong>行事の段取りを調べる</strong><span>祭りや行事の進め方を、前の担い手の語りと資料から調べます。</span><em>はじめる</em></button><button class="hub-card" data-start="record">${micIcon}<strong>町の記録を残す</strong><span>自分の知っている話や、文献のPDF・昔の写真を残します。</span><em>はじめる</em></button></div><div class="hub-lower" style="--i:1">${towns.length ? `<section class="hub-section"><h2>最近見た町</h2><div class="choices compact">${towns.map((n) => `<button class="town-chip" data-town="${esc(n)}">${esc(n)}</button>`).join("")}</div></section>` : `<section class="hub-section"><h2>まずは試してみる</h2><div class="choices compact"><button class="town-chip" data-town="青葉地区">架空の「青葉地区」</button></div></section>`}${ongoing.length ? `<section class="hub-section"><h2>続きから</h2><ul class="resume-list">${ongoing.map((r) => `<li><button class="resume" data-request="${r.id}"><span><strong>${esc(r.question)}</strong><small>${esc(r.place || r.event)}</small></span><em class="pill">${statuses[r.status] || ""}</em></button></li>`).join("")}</ul></section>` : ""}</div></div><div class="wave-band" aria-hidden="true"></div></section>`,
   );
   document.querySelectorAll("[data-start]").forEach((b) => (b.onclick = () => startIntake(b.dataset.start)));
   document.querySelectorAll("[data-town]").forEach((b) => (b.onclick = () => openPlace(b.dataset.town)));
@@ -409,7 +399,7 @@ function welcome() {
     .map((x) => `<li><span>${keyLabel[x.key] || ""}</span><b>${esc(x.label)}</b></li>`)
     .join("");
   const a0 = Object.fromEntries(intake.history.map((x) => [x.key, x.value])),
-    total = a0.purpose === "record" ? 3 : a0.knows === "no" ? 6 : 4,
+    total = 3,
     nowAt = Math.min(intake.history.length + 1, total),
     progress = `<div class="progress" role="img" aria-label="${total}問中${nowAt}問目">${Array.from({ length: total }, (_, i) => `<span class="${i < nowAt - 1 ? "done" : i === nowAt - 1 ? "now" : ""}"></span>`).join("")}<small>${nowAt} / ${total}</small></div>`;
   shell(
@@ -425,16 +415,6 @@ function welcome() {
     (b) =>
       (b.onclick = () => {
         commit(cur, b.dataset.v, b.dataset.l);
-      }),
-  );
-  document.querySelectorAll("[data-switch]").forEach(
-    (b) =>
-      (b.onclick = () => {
-        intake.history = [
-          { key: "purpose", value: "view", label: "町の記録を見たい", q: questionFor("purpose").q },
-          { key: "knows", value: "no", label: "まだ決まっていない", q: questionFor("knows").q },
-        ];
-        render();
       }),
   );
   $("#free-form") &&

@@ -51,6 +51,30 @@ const ART = {
     "#e3e9f3",
     `<path d="M14 112h132" stroke="${INK}" stroke-width="2"/><path d="M22 112V84l18-14 18 14v28z" fill="${PAPER}" stroke="${INK}" stroke-width="2"/><path d="M18 86l22-18 22 18" fill="none" stroke="${SHU}" stroke-width="4"/><rect x="100" y="40" width="40" height="72" fill="${NAVY}"/><g fill="${YAMABUKI}">${[0, 1, 2, 3].map((r) => `<rect x="108" y="${50 + r * 15}" width="8" height="8"/><rect x="124" y="${50 + r * 15}" width="8" height="8"/>`).join("")}</g><path d="M66 66q14-14 28 0" fill="none" stroke="${ASAGI}" stroke-width="3" stroke-linecap="round"/><path d="M90 60l4 6-7 1" fill="none" stroke="${ASAGI}" stroke-width="3" stroke-linecap="round"/>`,
   ),
+  roles: svg(
+    "#fdf0d6",
+    `<g stroke="${INK}" stroke-width="2"><circle cx="46" cy="44" r="13" fill="${NAVY}"/><circle cx="80" cy="38" r="13" fill="${SHU}"/><circle cx="114" cy="44" r="13" fill="${YAMABUKI}"/></g><path d="M26 100q20-34 40 0zM60 94q20-34 40 0zM94 100q20-34 40 0z" fill="${PAPER}" stroke="${INK}" stroke-width="2"/>`,
+  ),
+  rain: svg(
+    "#e3e9f3",
+    `<path d="M26 66a54 46 0 0 1 108 0z" fill="${SHU}" stroke="${INK}" stroke-width="2"/><path d="M80 66v34a8 8 0 0 1-16 0" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><g stroke="${NAVY}" stroke-width="3" stroke-linecap="round"><path d="M30 86l-4 12M52 94l-4 12M110 90l-4 12M132 82l-4 12"/></g>`,
+  ),
+  tools: svg(
+    "#fbe3dc",
+    `<rect x="34" y="52" width="92" height="52" rx="3" fill="${PAPER}" stroke="${INK}" stroke-width="2"/><path d="M30 52h100l-8-18H38z" fill="${NAVY}"/><path d="M34 70h92" stroke="${INK}" stroke-width="2"/><rect x="70" y="64" width="20" height="14" rx="2" fill="${YAMABUKI}" stroke="${INK}" stroke-width="2"/>`,
+  ),
+  money: svg(
+    "#fdf0d6",
+    `<g stroke="${INK}" stroke-width="2.5"><circle cx="62" cy="62" r="30" fill="${YAMABUKI}"/><rect x="52" y="52" width="20" height="20" fill="#fdf0d6"/><circle cx="108" cy="72" r="24" fill="${PAPER}"/><rect x="99" y="63" width="18" height="18" fill="#fdf0d6"/></g>`,
+  ),
+  contacts: svg(
+    "#def1ef",
+    `<rect x="26" y="34" width="108" height="68" rx="4" fill="${PAPER}" stroke="${INK}" stroke-width="2"/><path d="M26 38l54 36 54-36" fill="none" stroke="${INK}" stroke-width="2"/><circle cx="80" cy="74" r="9" fill="${SHU}"/>`,
+  ),
+  handover: svg(
+    NAVY,
+    `${waves(118, "#ffffff", 0.18)}${lantern(40, 44, 0.9, false)}${lantern(120, 44, 0.9)}<path d="M62 62h36m-10-10l10 10-10 10" fill="none" stroke="${YAMABUKI}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
 };
 const PHOTO = { sea: "setouchi", mountain: "satoyama", town: "kansai" };
 
