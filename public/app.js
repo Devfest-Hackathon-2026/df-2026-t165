@@ -1081,8 +1081,13 @@ function requestSide(r) {
 function interview() {
   const r = current();
   if (!r) return go("hub");
+  const composerHtml = `<div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon("mic")}</button><button class="round primary" ${busy ? "disabled" : ""} aria-label="お話を伝える">${icon("send")}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button></div>`;
   shell(
-    `<section class="page-header">${stepper(2)}<h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form"><div class="composer"><label class="sr-only" for="utterance">お話を入力</label><textarea id="utterance" placeholder="話すか、ここに入力してください" required maxlength="8000"></textarea><button type="button" class="round" id="dictate" aria-label="声でお話を入力">${icon("mic")}</button><button class="round primary" ${busy ? "disabled" : ""} aria-label="お話を伝える">${icon("send")}</button></div><div class="inline-actions"><button type="button" class="text-btn" id="sample">架空の台詞を入力</button><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div>${config.aiReady ? '<button type="button" class="text-btn" id="live">声で会話を続ける（最大5分）</button>' : ""}</form></section></div>`,
+    `<section class="page-header">${stepper(2)}<h1>いつもの言葉で、教えてください。</h1><p>下書きを作ったあとに、内容を一緒に確認できます。</p></section><div class="work-layout">${requestSide(r)}<section class="chat"><header class="chat-top"><h2>${esc(r.speaker)}のお話</h2><small>${config.aiReady ? "Gemini" : "体験用の聞き役"}</small></header><div class="chat-log" aria-live="polite">${r.turns.map((t) => `<div class="msg ${t.role}"><p class="who">${t.role === "user" ? esc(r.speaker) : "ツギテ"}</p><p class="bubble">${esc(t.text)}</p></div>`).join("")}</div><div id="live-status"></div><form class="chat-bottom" id="talk-form">${
+      config.aiReady
+        ? `<div class="voice-hero"><button type="button" class="voice-btn" id="live" aria-label="声で話しかける">${icon("mic")}</button><p class="voice-title">押して、話しかける</p><p class="voice-note">最大5分。声は保存せず、文字にして記録します。</p></div><div class="voice-secondary"><button type="button" class="secondary-btn" id="show-text" aria-expanded="false" aria-controls="text-entry">文字で入力する</button><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div><div id="text-entry" class="text-entry" hidden>${composerHtml}</div>`
+        : `${composerHtml}<div class="inline-actions"><button type="button" class="secondary-btn" id="finish" ${busy ? "disabled" : ""}>手引きの下書きを作る</button></div>`
+    }</form></section></div>`,
   );
   $("#speaker").onchange = (e) => {
     r.speaker = e.target.value;
@@ -1094,6 +1099,13 @@ function interview() {
     await say($("#utterance").value);
   };
   $("#dictate").onclick = () => dictate($("#utterance"));
+  $("#show-text")?.addEventListener("click", (e) => {
+    const box = $("#text-entry"),
+      open = box.hidden;
+    box.hidden = !open;
+    e.currentTarget.setAttribute("aria-expanded", String(open));
+    if (open) $("#utterance").focus();
+  });
   $("#sample").onclick = () => {
     const n = r.turns.filter((t) => t.role === "user").length;
     $("#utterance").value = DEMO.lines[n % DEMO.lines.length];
@@ -1273,6 +1285,8 @@ function dictate(target) {
   r.start();
   toast("お話しください。音声認識はブラウザの機能を利用します。");
 }
+let liveTick = null,
+  liveEndsAt = 0;
 async function startLive() {
   if (busy || liveAbort) return;
   const controller = new AbortController();
@@ -1298,17 +1312,33 @@ async function startLive() {
       onStatus: (text, stop) => {
         const n = $("#live-status");
         if (!n) return;
-        n.className = "live-indicator";
-        n.textContent = text;
+        const waiting = /準備/.test(text);
+        $("#talk-form")?.classList.add("is-live");
+        n.className = "live-panel";
+        n.innerHTML = `<p class="live-title"><span class="live-dot" aria-hidden="true"></span>${waiting ? "つなげています" : "聞いています"}</p><div class="live-wave" aria-hidden="true">${"<span></span>".repeat(11)}</div><p class="live-note" role="status">${esc(text)}${waiting ? "" : ' 残り <b id="live-left"></b>'}</p>`;
+        if (!waiting) {
+          liveEndsAt ||= Date.now() + 300000;
+          const left = () => {
+            const sec = Math.max(0, Math.round((liveEndsAt - Date.now()) / 1000)),
+              el = $("#live-left");
+            if (el) el.textContent = `${Math.floor(sec / 60)}分${String(sec % 60).padStart(2, "0")}秒`;
+          };
+          left();
+          clearInterval(liveTick);
+          liveTick = setInterval(left, 1000);
+        }
         if (stop) {
           const b = document.createElement("button");
-          b.className = "secondary-btn";
-          b.textContent = "会話を終了";
+          b.type = "button";
+          b.className = "live-stop";
+          b.textContent = "会話を終了する";
           b.onclick = stop;
           n.append(b);
         }
       },
       onEnd: (error) => {
+        clearInterval(liveTick);
+        liveEndsAt = 0;
         if (liveAbort === controller) liveAbort = null;
         render();
         if (error) toast(error);
