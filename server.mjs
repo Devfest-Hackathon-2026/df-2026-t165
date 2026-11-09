@@ -12,14 +12,14 @@ import {Readable} from 'node:stream';
 import {Storage} from '@google-cloud/storage';
 import {createMaterialStore,materialRecord,publicRecord,sniff,MAX_BYTES} from './src/materials.mjs';
 import {townData,buildSources,cleanStories,cleanHistory,TOWN_SYSTEM,townPrompt,parseTownAnswer,REGIONS_SYSTEM,cleanRegionRequest,regionsPrompt,parseRegions} from './src/town.mjs';
-// 音声(Live)は global では使えないモデルがあるため、場所を分ける（既定 us-central1）
-const liveAi=vertex&&project?new GoogleGenAI({vertexai:true,project,location:process.env.GEMINI_LIVE_LOCATION||'us-central1',httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null;
 const liveTickets=new Map();const LIVE_MODEL=process.env.GEMINI_LIVE_MODEL||'gemini-3.8-live';
 const ROOT=path.dirname(fileURLToPath(import.meta.url));const PORT=Number(process.env.PORT||4321);
 const project=process.env.GOOGLE_CLOUD_PROJECT||process.env.GCLOUD_PROJECT;
 const useFirestore=Boolean(project&&process.env.TSUGITE_STORAGE!=='local');const db=useFirestore?new Firestore({projectId:project,databaseId:process.env.FIRESTORE_DATABASE||'(default)'}):null;
 const apiKey=(process.env.GEMINI_API_KEY||'').replace(/\s+/g,'');const vertex=process.env.GEMINI_BACKEND==='vertex';// vertex：Cloud Runのサービスアカウントで認証し、プロジェクトの請求先で課金する（キーは使わない）
 const ai=vertex?(project?new GoogleGenAI({vertexai:true,project,location:process.env.GEMINI_LOCATION||'global',httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null):apiKey?new GoogleGenAI({apiKey,httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null;
+// 音声(Live)は global では使えないモデルがあるため、場所を分ける（既定 us-central1）
+const liveAi=vertex&&project?new GoogleGenAI({vertexai:true,project,location:process.env.GEMINI_LIVE_LOCATION||'us-central1',httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null;
 const accessCode=process.env.DEMO_ACCESS_CODE||'';const quota=new Map();let chosenModel=process.env.GEMINI_TEXT_MODEL||'auto';
 const dataRoot=process.env.TSUGITE_DATA_DIR||path.join(process.env.NODE_ENV==='production'?'/tmp':ROOT,'.runtime');
 const bucketName=process.env.TSUGITE_BUCKET||'';const bucket=bucketName?new Storage(project?{projectId:project}:{}).bucket(bucketName):null;
