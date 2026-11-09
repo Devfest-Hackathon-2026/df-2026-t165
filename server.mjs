@@ -13,7 +13,7 @@ import {townData,buildSources,cleanStories,cleanHistory,TOWN_SYSTEM,townPrompt,p
 const ROOT=path.dirname(fileURLToPath(import.meta.url));const PORT=Number(process.env.PORT||4321);
 const project=process.env.GOOGLE_CLOUD_PROJECT||process.env.GCLOUD_PROJECT;
 const useFirestore=Boolean(project&&process.env.TSUGITE_STORAGE!=='local');const db=useFirestore?new Firestore({projectId:project,databaseId:process.env.FIRESTORE_DATABASE||'(default)'}):null;
-const apiKey=process.env.GEMINI_API_KEY;const ai=apiKey?new GoogleGenAI({apiKey,httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null;
+const apiKey=(process.env.GEMINI_API_KEY||'').replace(/\s+/g,'');const ai=apiKey?new GoogleGenAI({apiKey,httpOptions:{timeout:45000,...(process.env.GEMINI_BASE_URL?{baseUrl:process.env.GEMINI_BASE_URL}:{})}}):null;
 const accessCode=process.env.DEMO_ACCESS_CODE||'';const quota=new Map();let chosenModel=process.env.GEMINI_TEXT_MODEL||'auto';
 const dataRoot=process.env.TSUGITE_DATA_DIR||path.join(process.env.NODE_ENV==='production'?'/tmp':ROOT,'.runtime');
 const bucketName=process.env.TSUGITE_BUCKET||'';const bucket=bucketName?new Storage(project?{projectId:project}:{}).bucket(bucketName):null;
