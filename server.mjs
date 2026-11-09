@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import {timingSafeEqual,randomUUID} from 'node:crypto';
-import {GoogleGenAI,Modality} from '@google/genai';
+import {GoogleGenAI,Modality,ThinkingLevel} from '@google/genai';
 import {WebSocketServer} from 'ws';
 import {liveInstruction} from './public/live-core.js';
 import {Firestore} from '@google-cloud/firestore';
@@ -32,7 +32,7 @@ function checkTurns(turns){if(!Array.isArray(turns)||turns.length>200||turns.som
 async function textModel(){if(chosenModel!=='auto')return chosenModel;if(vertex)return chosenModel='gemini-3-flash-preview';const pager=await ai.models.list();for await(const m of pager){if(/flash/.test(m.name)&&!/live|audio|image|tts|embedding|native/.test(m.name)&&m.supportedActions?.includes('generateContent')){chosenModel=m.name.replace('models/','');return chosenModel}}throw Error('利用可能なテキストモデルが見つかりません。GEMINI_TEXT_MODELを設定してください')}
 function uploadBudget(who){let q=uploads.get(who)||{count:0,time:Date.now()};if(Date.now()-q.time>3600000)q={count:0,time:Date.now()};if(++q.count>40)throw Error('この作業領域の資料登録の上限（1時間40件）に達しました');uploads.set(who,q)}
 function aiBudget(req){const who=req.headers['x-workspace-id'];if(!/^[a-f0-9-]{36}$/.test(who||''))throw Error('作業領域が不正です');let q=quota.get(who)||{count:0,time:Date.now()};if(Date.now()-q.time>3600000)q={count:0,time:Date.now()};if(++q.count>30)throw Error('この作業領域のAI利用上限（1時間30回）に達しました');quota.set(who,q)}
-async function modelResponse(system,contents,jsonMode=false){const result=await ai.models.generateContent({model:await textModel(),contents,config:{systemInstruction:system,temperature:.2,maxOutputTokens:2400,...(jsonMode?{responseMimeType:'application/json'}:{})}});return {text:result.text,usage:result.usageMetadata||{}}}
+async function modelResponse(system,contents,jsonMode=false){const result=await ai.models.generateContent({model:await textModel(),contents,config:{systemInstruction:system,temperature:.2,maxOutputTokens:8192,...(vertex?{thinkingConfig:{thinkingLevel:ThinkingLevel.LOW}}:{}),...(jsonMode?{responseMimeType:'application/json'}:{})}});if(result.candidates?.[0]?.finishReason==='MAX_TOKENS')throw Error('回答が長くて途中で切れました。もう一度お試しください。');return {text:result.text,usage:result.usageMetadata||{}}}
 // 資料（PDF・写真）：一覧・登録・ファイル取得・削除。登録は multipart（file と meta）で20MBまで
 async function materialsRoute(req,res,url){
  const who=req.headers['x-workspace-id'],parts=url.pathname.split('/').filter(Boolean);
