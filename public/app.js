@@ -74,7 +74,7 @@ function toast(text) {
 let saveChain = Promise.resolve();
 function save() {
   localStorage.setItem(key, JSON.stringify(state));
-  if (config.storage !== "browser" && (!config.requiresCode || code)) {
+  if (config.storage !== "browser") {
     const snapshot = JSON.stringify(state);
     saveChain = saveChain.then(async () => {
       try {
@@ -1461,7 +1461,7 @@ function regions() {
 }
 function settings() {
   modal(
-    `<h2>会話と保存の設定</h2><p>${config.aiReady ? "Google AIにつながっています。" : config.aiServer ? "いまは体験モードです（AIは使わず、この端末で流れを試せます）。デモアクセスコードを入れると、Geminiにつながります。" : "Google AIは未接続です。体験モードでは、この端末で流れを試せます。"}<br>保存：${esc(saveMessage)}</p>${config.requiresCode ? '<label>チームのデモアクセスコード<input class="field" type="password" id="access" autocomplete="off"></label><button class="secondary-btn" id="set-access">接続する</button>' : ""}<details class="settings-group"><summary>検証と記録</summary><div class="settings-buttons"><button class="secondary-btn" id="metrics">測定結果を見る</button><button class="secondary-btn" id="export-json">記録を保存</button><button class="secondary-btn" id="export-csv">測定CSVを保存</button></div><p>測定は実際に操作した結果だけ記録します。架空データ・チーム内テストも区別します。</p></details><div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`,
+    `<h2>会話と保存の設定</h2><p>${config.aiReady ? "Google AIの接続設定があります。利用時の通信で接続を確認します。" : "Google AIは未接続です。体験モードでは、この端末で流れを試せます。"}<br>保存：${esc(saveMessage)}</p>${config.requiresCode ? '<label>チームのデモアクセスコード<input class="field" type="password" id="access" autocomplete="off"></label><button class="secondary-btn" id="set-access">接続する</button>' : ""}<details class="settings-group"><summary>検証と記録</summary><div class="settings-buttons"><button class="secondary-btn" id="metrics">測定結果を見る</button><button class="secondary-btn" id="export-json">記録を保存</button><button class="secondary-btn" id="export-csv">測定CSVを保存</button></div><p>測定は実際に操作した結果だけ記録します。架空データ・チーム内テストも区別します。</p></details><div class="dialog-actions"><button class="secondary-btn" data-close>閉じる</button></div>`,
     () => {
       $("#metrics").onclick = () => {
         $("#dialog").close();
@@ -1475,13 +1475,9 @@ function settings() {
         sessionStorage.setItem("tsugite-access", code);
         try {
           await api("workspace/" + wid);
-          config.aiReady = Boolean(config.aiServer);
           save();
-          toast("接続を確認しました。AIにつながります。");
-          $("#dialog").close();
-          render();
+          toast("接続を確認しました。");
         } catch (e) {
-          if (config.requiresCode) config.aiReady = false;
           toast(e.message);
         }
       });
@@ -1611,9 +1607,6 @@ render();
 (async () => {
   try {
     config = await api("config");
-    // アクセスコードがないときは、AIを使わない体験モードで全画面を操作できる（コードを入れるとAIにつながる）
-    config.aiServer = config.aiReady;
-    if (config.requiresCode && !code) config.aiReady = false;
     if (config.storage !== "browser" && (!config.requiresCode || code)) {
       const saved = await api("workspace/" + wid);
       if (saved.data && state.requests.length === 0) {
@@ -1624,9 +1617,7 @@ render();
     }
     if (seedDemo(state)) save();
     saveMessage =
-      config.requiresCode && !code
-        ? "この端末のブラウザに保存"
-        : config.storage === "firestore"
+      config.storage === "firestore"
         ? "Firestoreと端末に保存"
         : config.storage === "browser"
           ? "この端末のブラウザに保存"
