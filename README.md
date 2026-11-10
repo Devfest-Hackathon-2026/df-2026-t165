@@ -57,11 +57,12 @@ AIの利用は費用と誤用を防ぐため、チーム用のアクセスコー
 
 | 技術 | 担う価値 | 実装の所在 |
 |---|---|---|
-| Gemini Live（`gemini-3.8-live`） | 声の聞き役。相槌や割り込みのある自然な会話で「話すだけ」の入口を成立させる | `public/live-core.js`（接続設定と聞き取りプロンプト）、`server.mjs`（短期トークンと音声の中継） |
-| Gemini（Vertex AI、`gemini-3-flash-preview`） | 語りを段取りメモ・手引きに組み立てる整理と、出典つき回答 | `server.mjs`、`src/town.mjs`、`src/guard.mjs`（サーバー側、Cloud Run） |
-| Firestore | 語りと手引きの保存（語り手・出典となる発言・本人の確認状態と一緒に保存。生音声は保存しない） | `server.mjs`、`src/materials.mjs` |
-| Cloud Storage | 写真・資料の保存 | `src/materials.mjs` |
-| Cloud Run | 公開URLでの提供 | `scripts/deploy-google.sh` |
+| Gemini Live（`gemini-3.8-live`、Vertex AI） | 声の聞き役。語り手の声を聞いて声で返し、「話すだけ」で語れる入口をつくる。語りは文字起こしとして取り出す | `public/live-core.js`（聞き役の指示文）、`public/live-proxy.js`（ブラウザ側の接続と音声の入出力）、`server.mjs`（Liveへの接続と音声の中継） |
+| Gemini（`gemini-3-flash-preview`、Vertex AI） | 聞き取りの聞き返し質問、語りの手引き（6項目）への整理、町の出典つき回答。すべてサーバー側で呼び出す | `server.mjs`（呼び出し）、`src/town.mjs`（町の回答の指示文と出典の検証）、`src/guard.mjs`（入力の守り） |
+| Firestore | 語り・手引き・本人の確認状態（作業領域ごと）と、資料の説明文の保存。生音声は保存しない | `server.mjs`、`src/materials.mjs` |
+| Cloud Storage | 資料ファイル（PDF・写真など）の保存 | `src/materials.mjs` |
+| Cloud Run | 公開URLでの提供（東京、最小0・最大1インスタンス） | `scripts/deploy-google.sh` |
+| Secret Manager | Gemini APIキーとアクセスコードの保管 | `scripts/deploy-google.sh` |
 
 ・音声の区切り判定は、Gemini Liveの標準の活動検出を使っています（アプリ側で秒数は指定していません）
 
@@ -70,12 +71,12 @@ AIの利用は費用と誤用を防ぐため、チーム用のアクセスコー
 
 | 層 | 使っているもの |
 |---|---|
-| 画面 | HTML／CSS／JavaScript（フレームワークなし）、Phosphor Icons、Klee One・Zen Maru Gothic |
-| サーバー | Node.js 22以上、単一ファイルの `server.mjs`、`ws`（Liveの音声中継） |
-| AI | `@google/genai` 経由で Vertex AI の Gemini（`gemini-3-flash-preview`）と Gemini Live（`gemini-3.8-live`） |
-| 保存 | Firestore（語り・手引き）、Cloud Storage（資料ファイル） |
-| 公開 | Cloud Run（東京）、Secret Manager |
-| 開発 | esbuild（ビルド）、Node標準のテストランナー（42件）、攻撃テスト（`scripts/attack-test.mjs`） |
+| 画面 | HTML／CSS／JavaScript（フレームワークなし）。音声の入出力はWeb Audio（AudioWorklet）。Phosphor Icons、Klee One・Zen Maru Gothic（Google Fonts） |
+| サーバー | Node.js 22以上、単一ファイルの `server.mjs`、`ws`（Liveの音声を中継するWebSocket） |
+| AI | `@google/genai`（Vertex AI経由でGeminiとGemini Liveを呼び出し） |
+| 保存 | `@google-cloud/firestore`、`@google-cloud/storage` |
+| 公開 | Cloud Run、Secret Manager（`scripts/deploy-google.sh`） |
+| 開発 | esbuild（ブラウザ用のSDKをまとめる）、Node標準のテストランナー（42件）、攻撃テスト（`scripts/attack-test.mjs`） |
 
 
 ## AIの役割の設計
