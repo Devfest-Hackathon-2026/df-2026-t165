@@ -56,7 +56,7 @@ async function materialsRoute(req,res,url){
  return json(res,405,{error:'この操作は利用できません'})}
 export const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost');
  if(url.pathname==='/healthz')return json(res,200,{ok:true});
- if(url.pathname==='/api/config')return json(res,200,{aiReady:Boolean(ai&&accessCode),requiresCode:Boolean(accessCode),storage:useFirestore?'firestore':'local-file',liveModel:process.env.GEMINI_LIVE_MODEL||'gemini-3.8-live',maxSessionSeconds:300,materialStorage:materials.mode.files,mapsKey:process.env.GOOGLE_MAPS_API_KEY||''});
+ if(url.pathname==='/api/config')return json(res,200,{aiReady:Boolean(ai&&accessCode),requiresCode:Boolean(accessCode),storage:useFirestore?'firestore':'local-file',liveModel:process.env.GEMINI_LIVE_MODEL||'gemini-3.8-live',maxSessionSeconds:300,materialStorage:materials.mode.files});
  if(url.pathname.startsWith('/api/')){
   if(!allowed(req))return json(res,401,{error:ai&&!accessCode?'AI利用には管理者によるデモアクセスコードの設定が必要です。':'設定のデモアクセスコードを確認してください。'});
   if(url.pathname.startsWith('/api/workspace/')){const id=url.pathname.split('/').at(-1);if(!/^[a-f0-9-]{36}$/.test(id))return json(res,400,{error:'作業領域が不正です'});

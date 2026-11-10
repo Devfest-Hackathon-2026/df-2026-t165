@@ -142,96 +142,7 @@ const esc = (s) =>
       ],
   );
 
-// 地図の描画エンジン。キーがあれば Google Maps、なければ（または読めなければ）地理院タイル＋Leaflet
-const GOOGLE_STYLE = [
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { stylers: [{ saturation: -55 }, { lightness: 18 }] },
-];
-let googlePromise;
-const failHandlers = new Set();
-function loadGoogle(key) {
-  googlePromise ||= new Promise((resolve, reject) => {
-    if (window.google?.maps?.Map) return resolve();
-    window.gm_authFailure = () => failHandlers.forEach((f) => f());
-    const cb = "__tsugiteMapsReady";
-    window[cb] = () => resolve();
-    const el = document.createElement("script");
-    el.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&language=ja&region=JP&callback=${cb}`;
-    el.async = true;
-    el.onerror = () => reject(new Error("maps load failed"));
-    document.head.appendChild(el);
-    setTimeout(() => reject(new Error("maps timeout")), 10000);
-  });
-  googlePromise.catch(() => (googlePromise = null));
-  return googlePromise;
-}
-async function googleEngine(mapEl, key, onFail) {
-  await loadGoogle(key);
-  failHandlers.add(onFail);
-  const g = window.google.maps;
-  const map = new g.Map(mapEl, {
-    center: { lat: 36.6, lng: 137.5 },
-    zoom: 5,
-    minZoom: 4,
-    maxZoom: 12,
-    disableDefaultUI: true,
-    zoomControl: true,
-    gestureHandling: "cooperative",
-    clickableIcons: false,
-    styles: GOOGLE_STYLE,
-  });
-  class Pin extends g.OverlayView {
-    constructor(pos, el) {
-      super();
-      this.pos = pos;
-      this.el = el;
-      this.setMap(map);
-    }
-    onAdd() {
-      this.getPanes().overlayMouseTarget.appendChild(this.el);
-    }
-    draw() {
-      const p = this.getProjection()?.fromLatLngToDivPixel(this.pos);
-      if (p)
-        Object.assign(this.el.style, {
-          position: "absolute",
-          left: p.x + "px",
-          top: p.y + "px",
-        });
-    }
-    onRemove() {
-      this.el.remove();
-    }
-  }
-  let pins = [];
-  const clear = () => {
-    pins.forEach((x) => x.setMap(null));
-    pins = [];
-  };
-  return {
-    clear,
-    pin(lat, lng, label, selected, onClick) {
-      const el = document.createElement("span");
-      el.className = "mp-pin" + (selected ? " is-on" : "");
-      el.textContent = label;
-      el.tabIndex = 0;
-      el.setAttribute("role", "button");
-      el.onclick = onClick;
-      el.onkeydown = (e) =>
-        (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onClick());
-      pins.push(new Pin(new g.LatLng(lat, lng), el));
-    },
-    fly([lat, lng], zoom) {
-      map.panTo({ lat, lng });
-      map.setZoom(zoom);
-    },
-    destroy() {
-      clear();
-      failHandlers.delete(onFail);
-    },
-  };
-}
+// 地図の描画：国土地理院タイル＋Leaflet
 function leafletEngine(mapEl) {
   const L = window.L;
   if (!L) return null;
@@ -275,7 +186,7 @@ function leafletEngine(mapEl) {
  */
 export function mountMapPicker(
   root,
-  { onPick, confirmLabel = "この地域で決める", mapsKey = "" } = {},
+  { onPick, confirmLabel = "この地域で決める" } = {},
 ) {
   let region = null,
     pref = null,
@@ -353,13 +264,8 @@ export function mountMapPicker(
     mapEl.classList.toggle("is-off", !e);
     draw();
   };
-  const fallback = () => {
-    mapEl.innerHTML = "";
-    use(leafletEngine(mapEl));
-  };
   draw();
-  if (mapsKey) googleEngine(mapEl, mapsKey, fallback).then(use, fallback);
-  else use(leafletEngine(mapEl));
+  use(leafletEngine(mapEl));
   return {
     destroy: () => {
       gone = true;

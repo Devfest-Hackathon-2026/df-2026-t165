@@ -456,7 +456,6 @@ function welcome() {
   if ($("#area-map"))
     mountMapPicker($("#area-map"), {
       confirmLabel: "この地域で候補を探す",
-      mapsKey: config.mapsKey,
       onPick: ({ region, pref }) => commit("area", candidateKey(region, pref), pref ? `${region.name}・${pref}` : region.name, pref || region.name),
     });
   $("#back") &&
