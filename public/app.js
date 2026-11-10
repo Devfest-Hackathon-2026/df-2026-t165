@@ -13,7 +13,6 @@ import {
 } from "./domain.js";
 import { townData } from "./town-data.js";
 import { tileArt } from "./tile-art.js";
-import { mountMapPicker, candidateKey } from "./japan-map.js";
 import { seedDemo } from "./seed.js";
 import { putFile, deleteFile, fileUrl, kindOf, MAX_BYTES, ACCEPT, uploadMaterial, listMaterials, removeMaterial, useServerHeaders } from "./material-store.js";
 const $ = (s) => document.querySelector(s),
@@ -334,9 +333,7 @@ function questionFor(step) {
     return {
       q: s.q,
       hint: s.hint,
-      body: s.key === "area"
-        ? `<div id="area-map" class="map-slot"></div><div class="choices compact" style="--i:1"><button class="choice-sm" data-v="any" data-l="こだわらない">方面にはこだわらない</button></div><label class="label own-words" for="free" style="--i:2">地図にないときは、自分の言葉で</label><form class="free" id="free-form" style="--i:2"><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}"><button class="secondary-btn">次へ</button></form>`
-        : s.multi
+      body: s.multi
         ? `<form id="multi-form">${tiles(s.options, true)}<label class="label own-words" for="free" style="--i:${s.options.length}">自分の言葉でも書けます</label><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}" style="--i:${s.options.length}"><div class="intake-next" style="--i:${s.options.length + 1}"><button class="primary-btn">次へ</button><button type="button" class="text-btn" id="skip">とくにない</button></div></form>`
         : `${tiles(s.options)}<label class="label own-words" for="free" style="--i:${s.options.length}">選択肢にないときは、自分の言葉で</label><form class="free" id="free-form" style="--i:${s.options.length}"><input class="field" id="free" autocomplete="off" maxlength="300" placeholder="${s.placeholder}"><button class="secondary-btn">次へ</button></form>`,
     };
@@ -453,11 +450,6 @@ function welcome() {
   document.querySelectorAll(".tile[data-t]").forEach(
     (t) => (t.onclick = () => t.setAttribute("aria-pressed", String(t.getAttribute("aria-pressed") !== "true"))),
   );
-  if ($("#area-map"))
-    mountMapPicker($("#area-map"), {
-      confirmLabel: "この地域で候補を探す",
-      onPick: ({ region, pref }) => commit("area", candidateKey(region, pref), pref ? `${region.name}・${pref}` : region.name, pref || region.name),
-    });
   $("#back") &&
     ($("#back").onclick = () => {
       intake.history.pop();

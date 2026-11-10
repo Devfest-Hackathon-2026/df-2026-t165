@@ -180,6 +180,4 @@ flowchart LR
 | `public/style.css` | 見た目（後半にデザインの変更を追記していく形） |
 | `public/town-data.js` | 体験モード用の町のデータ（架空の青葉地区） |
 | `public/tile-art.js` | 選択肢タイルのイラスト |
-| `public/japan-map.js` | 地図の絞り込み（地方・都道府県の座標） |
 | `public/material-store.js` | 資料ファイルのブラウザ保存（IndexedDB） |
-| `public/lib/leaflet/` | 地図ライブラリ Leaflet 1.9.4（BSD-2） |

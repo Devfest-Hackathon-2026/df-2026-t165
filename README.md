@@ -70,7 +70,7 @@ AIの利用は費用と誤用を防ぐため、チーム用のアクセスコー
 
 | 層 | 使っているもの |
 |---|---|
-| 画面 | HTML／CSS／JavaScript（フレームワークなし）、Leaflet 1.9.4＋国土地理院タイル（地図）、Phosphor Icons、Klee One・Zen Maru Gothic |
+| 画面 | HTML／CSS／JavaScript（フレームワークなし）、Phosphor Icons、Klee One・Zen Maru Gothic |
 | サーバー | Node.js 22以上、単一ファイルの `server.mjs`、`ws`（Liveの音声中継） |
 | AI | `@google/genai` 経由で Vertex AI の Gemini（`gemini-3-flash-preview`）と Gemini Live（`gemini-3.8-live`） |
 | 保存 | Firestore（語り・手引き）、Cloud Storage（資料ファイル） |
