@@ -170,42 +170,6 @@ AIは「答える役」ではなく「引き出す役」です。AIに「道具�
 ・使用しているライブラリとライセンスは、著作物利用シートに記載しています（主なもの：@google/genai・@google-cloud/firestore・@google-cloud/storage はApache-2.0、ws・esbuild はMIT）
 
 
-## 開発者向け
-
-### ローカルで動かす
-Node.js 22以降が必要です。
-
-```sh
-npm ci
-npm run build
-npm test      # 自動テスト（42件）
-npm start
-```
-
-表示された `http://127.0.0.1:4321` を開きます。キーがなければ、ルール処理の体験モードで動きます。
-
-### 構成
-- `public/`：画面、音声クライアント、画像、デモ用の初期データ（`seed.js`）
-- `src/domain.mjs`：出典の検証、確認処理、体験モード
-- `src/town.mjs`：町の出典つき回答の組み立て
-- `src/guard.mjs`：守りの設計（命令とデータの分離、命令らしい文の除去）
-- `src/materials.mjs`：資料（PDF・写真・動画）の保存。動画はタイトルと説明だけを根拠にします
-- `server.mjs`：Gemini、Live用の短期トークン、Firestore／ローカル保存
-- `scripts/`：ビルド、公開手順（`deploy-google.sh`）、攻撃テスト（`attack-test.mjs`）
-- `tests/`：未確認情報、出典ID、確認必須、保存API、守りの設計のテスト
-
-### 攻撃テスト
-```sh
-ACCESS_CODE=（デモのアクセスコード） node scripts/attack-test.mjs
-```
-
-### Google Cloudへ公開する
-Cloud Shellで、`devfest165` を操作できるアカウントから次を実行します（Gemini APIキーとアクセスコードは、その場で非表示入力します）。
-
-```sh
-bash scripts/deploy-google.sh devfest165
-```
-
 Cloud Run（東京、サービス名 `tsugite-demo`、最小0・最大1インスタンス）、Firestore、Secret Managerを設定します。Liveの1回の会話は最大5分、AI APIは作業領域ごとに1時間30回の制限です。課金上限を保証する仕組みではないため、利用枠と課金状況を確認してください。
 
 生の音声はこのアプリには保存しません。Liveでは会話の音声をGoogleへ送ります。APIキーはサーバーに置き、ブラウザへはLive用の短期トークンだけ返します。AIを使う前に、語り手の了解を得てください。
